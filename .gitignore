@@ -1,0 +1,21 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+.vite/
+
+# Environment and runtime data
+.env
+.env.local
+!.env.example
+uploads/
+*.log
+
+# MongoDB data when a local bind mount is used
+mongo-data/
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,27 @@
+{
+  "name": "emberserve-pos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EmberServe POS — a real-time restaurant operating system",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c saffron,cyan \"npm run dev --workspace=@emberserve/api\" \"npm run dev --workspace=@emberserve/web\"",
+    "build": "npm run build --workspace=@emberserve/shared && npm run build --workspace=@emberserve/api && npm run build --workspace=@emberserve/web",
+    "test": "npm run test --workspaces --if-present",
+    "seed": "npm run seed --workspace=@emberserve/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10"
+  }
+}

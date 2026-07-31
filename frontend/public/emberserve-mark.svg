@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="EmberServe flame mark">
+  <defs><linearGradient id="f" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f39a43"/><stop offset="1" stop-color="#bb481a"/></linearGradient></defs>
+  <rect width="128" height="128" rx="34" fill="#262520"/>
+  <path d="M72 13c5 20-7 29-7 42 0 7 5 13 13 13 13 0 19-12 15-28 15 13 23 28 20 45-3 20-20 31-42 31-26 0-41-15-41-37 0-25 16-42 31-55-4 18 1 28 11 30-4-16 0-29 0-41z" fill="url(#f)"/>
+  <path d="M65 54c-5 11-15 19-15 34 0 13 10 21 22 21 17 0 25-13 20-30-3 10-10 15-18 15-10 0-15-8-12-18 1-7 4-14 3-22z" fill="#ffe5a4"/>
+</svg>

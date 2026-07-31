@@ -1,0 +1,17 @@
+{
+  "name": "EmberServe POS",
+  "short_name": "EmberServe",
+  "description": "A real-time restaurant operating system.",
+  "start_url": "/menu",
+  "display": "standalone",
+  "background_color": "#f5f0e6",
+  "theme_color": "#23221f",
+  "icons": [
+    {
+      "src": "/emberserve-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

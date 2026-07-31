@@ -1,0 +1,48 @@
+import { useEffect, useMemo, useState } from "react";
+import { BellRing, Check, ChevronRight, ClipboardList, ConciergeBell, CookingPot, LayoutGrid, Minus, Plus, ReceiptText, Search, Send, Sparkles, Table2, UsersRound } from "lucide-react";
+import { Brand } from "@/shared/components/brand";
+import { ConnectionBadge } from "@/shared/components/connection-badge";
+import { FoodVisual } from "@/shared/components/food-visual";
+import { QuantityControl } from "@/shared/components/quantity-control";
+import { StatusPill } from "@/shared/components/status-pill";
+import { useLiveUpdates } from "@/shared/hooks/useLiveUpdates";
+import { formatMoney } from "@/shared/lib/format";
+import { usePos } from "@/shared/store/pos-store";
+
+const tableTone = (status: string) => `table-card table-card--${status}`;
+
+export const WaiterPage = () => {
+  const {
+    tables, orders, cart, addToCart, updateLineQuantity, selectedTableId, selectTable, adjustGuests,
+    placeOrder, requestBill, serveOrder, setCartMode, menu, isMutating, refreshOperations,
+  } = usePos();
+  const [zone, setZone] = useState("All tables");
+  const [search, setSearch] = useState("");
+  const live = useLiveUpdates(refreshOperations);
+  useEffect(() => setCartMode("DINE_IN"), [setCartMode]);
+  const selectedTable = tables.find((table) => table.id === selectedTableId) ?? tables[0];
+  const selectedOrder = orders.find((order) => order.id === selectedTable?.orderId);
+  const readyOrders = orders.filter((order) => order.status === "READY" || order.status === "PARTIALLY_READY");
+  const filteredTables = tables.filter((table) => zone === "All tables" || table.zone === zone);
+  const menuResults = useMemo(() => menu.filter((item) => {
+    const needle = search.trim().toLowerCase();
+    return !needle || item.name.toLowerCase().includes(needle) || item.category.toLowerCase().includes(needle);
+  }).slice(0, 5), [menu, search]);
+
+  if (!selectedTable) return null;
+
+  return <main className="waiter-page">
+    <header className="waiter-header"><Brand /><div className="waiter-header__title"><span className="eyebrow">Floor service</span><strong>Good evening, Maya</strong></div><div className="waiter-header__actions"><ConnectionBadge live={live} /><button type="button" className="icon-button" aria-label="Open alerts"><BellRing size={19} />{readyOrders.length > 0 && <b className="notification-dot" />}</button><button type="button" className="waiter-avatar" aria-label="Maya Chen profile">MC</button></div></header>
+    <section className="waiter-ready-strip"><div className="waiter-ready-strip__icon"><ConciergeBell size={23} /></div><div><span className="eyebrow">Ready to serve</span><strong>{readyOrders.length ? `${readyOrders.length} tables need your hands` : "Everything is flowing smoothly"}</strong></div><div className="ready-table-pills">{readyOrders.slice(0, 3).map((order) => <button type="button" key={order.id} onClick={() => { const table = tables.find((candidate) => candidate.orderId === order.id); if (table) selectTable(table.id); }}><span>{order.tableLabel}</span><ChevronRight size={15} /></button>)}</div><button type="button" className="text-link">View queue <ChevronRight size={16} /></button></section>
+    <div className="waiter-layout">
+      <section className="waiter-tables"><div className="waiter-section-heading"><div><span className="eyebrow">Your section · 8 tables</span><h1>The room at a glance</h1></div><button type="button" className="outline-button"><LayoutGrid size={17} /> Floor plan</button></div><div className="zone-tabs">{["All tables", "Window", "Main room", "Terrace", "Private"].map((value) => <button key={value} type="button" className={zone === value ? "zone-tab zone-tab--active" : "zone-tab"} onClick={() => setZone(value)}>{value}</button>)}</div><div className="table-grid">{filteredTables.map((table) => <button type="button" className={`${tableTone(table.status)} ${table.id === selectedTable.id ? "table-card--selected" : ""}`} key={table.id} onClick={() => selectTable(table.id)}><div className="table-card__head"><strong>{table.label}</strong><StatusPill status={table.status} subtle /></div><div className="table-card__guests"><UsersRound size={16} /><span>{table.guests ? `${table.guests}/${table.seats} guests` : `${table.seats} seats`}</span></div><div className="table-card__foot"><span>{table.elapsedMinutes ? `${table.elapsedMinutes} min` : "Fresh table"}</span><b>{table.total ? formatMoney(table.total) : "—"}</b></div>{table.status === "attention" && <span className="table-card__alert">Needs attention</span>}</button>)}</div><section className="waiter-tip"><Sparkles size={19} /><div><strong>Service cue</strong><p>T03 has a partial ready order. Offer the first course before the mains land.</p></div></section></section>
+      <aside className="waiter-order-sheet"><header className="waiter-order-sheet__header"><div><span className="eyebrow">{selectedTable.zone} · {selectedTable.seats} seats</span><h2>{selectedTable.label} <StatusPill status={selectedTable.status} subtle /></h2></div><button type="button" className="icon-button" aria-label="More table actions"><ClipboardList size={19} /></button></header><div className="guest-control"><span><UsersRound size={17} /> Guests</span><div><button type="button" onClick={() => adjustGuests(selectedTable.id, -1)} aria-label="Remove guest"><Minus size={15} /></button><b>{selectedTable.guests || 0}</b><button type="button" onClick={() => adjustGuests(selectedTable.id, 1)} aria-label="Add guest"><Plus size={15} /></button></div></div>
+        <section className="waiter-order-sheet__sent"><div className="sheet-subhead"><span>Sent to kitchen</span>{selectedOrder && <StatusPill status={selectedOrder.status} subtle />}</div>{selectedOrder?.items.length ? selectedOrder.items.map((item) => <article className="sent-line" key={item.id}><span className="sent-line__qty">{item.quantity}×</span><div><strong>{item.name}</strong><small>{item.modifiers?.join(" · ") || item.note || "Kitchen standard"}</small></div><StatusPill status={item.status} subtle /></article>) : <div className="sheet-empty"><CookingPot size={23} /><span>No rounds sent yet.</span></div>}</section>
+        <section className="waiter-order-sheet__draft"><div className="sheet-subhead"><span>Unsent round</span>{cart.length > 0 && <b>{cart.length} items</b>}</div>{cart.length ? cart.map((line) => <article className="draft-line" key={line.id}><div><strong>{line.item.name}</strong><small>{formatMoney(line.item.price)} each</small></div><QuantityControl compact quantity={line.quantity} onChange={(adjustment) => updateLineQuantity(line.id, adjustment)} /></article>) : <div className="sheet-empty"><Send size={23} /><span>Add a dish to start the next round.</span></div>}</section>
+        <section className="waiter-quick-add"><label className="search-field search-field--compact"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Add a dish" /></label><div className="quick-add-list">{menuResults.map((item) => <button type="button" key={item.id} onClick={() => addToCart(item)}><FoodVisual item={item} size="mini" /><span><strong>{item.name}</strong><small>{formatMoney(item.price)}</small></span><Plus size={17} /></button>)}</div></section>
+        <footer className="waiter-order-sheet__footer"><div><span>Table total</span><strong>{formatMoney(selectedTable.total + cart.reduce((sum, line) => sum + line.item.price * line.quantity * 1.1, 0))}</strong></div><div className="sheet-actions"><button type="button" className="outline-button" onClick={() => requestBill(selectedTable.id)} disabled={isMutating || !selectedTable.total}>Request bill</button><button type="button" className="button button--saffron" onClick={() => placeOrder("waiter")} disabled={isMutating || !cart.length}><Send size={17} /> {isMutating ? "Saving…" : <>Send {cart.length ? `· ${cart.length}` : ""}</>}</button></div>{selectedOrder?.status === "READY" && <button type="button" className="serve-button" onClick={() => serveOrder(selectedOrder.id)} disabled={isMutating}><Check size={17} /> Mark ready items served</button>}</footer>
+      </aside>
+    </div>
+    <nav className="waiter-mobile-nav" aria-label="Waiter mobile navigation"><button type="button" className="is-active"><Table2 size={20} /><span>Tables</span></button><button type="button"><ClipboardList size={20} /><span>Orders</span></button><button type="button"><ConciergeBell size={20} /><span>Ready</span>{readyOrders.length > 0 && <b>{readyOrders.length}</b>}</button><button type="button"><BellRing size={20} /><span>Alerts</span></button><button type="button"><ReceiptText size={20} /><span>Profile</span></button></nav>
+  </main>;
+};
