@@ -39,5 +39,11 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build workspaces
-        run: npm run build
+      - name: Build shared package
+        run: npm run build --workspace=@emberserve/shared
+
+      - name: Build API
+        run: npm run build --workspace=@emberserve/api
+
+      - name: Build web app
+        run: npm run build --workspace=@emberserve/web
