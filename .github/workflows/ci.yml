@@ -33,6 +33,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # npm can omit platform-specific optional dependencies from a lockfile
+      # generated on another OS (npm/cli#4828). Rollup needs its Linux native
+      # package at runtime, so restore the exact Rollup-matched package for CI.
+      - name: Restore Rollup Linux native dependency
+        run: |
+          ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version")
+          npm install --no-save --ignore-scripts "@rollup/rollup-linux-x64-gnu@${ROLLUP_VERSION}"
+
       - name: Typecheck workspaces
         run: npm run typecheck
 
