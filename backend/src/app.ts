@@ -10,6 +10,7 @@ import { databaseStatus } from "./config/database.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
 import { errorHandler, notFoundHandler } from "./middleware/errors.js";
+import { requireAuth } from "./middleware/auth.js";
 import { cashierRouter } from "./routes/cashier.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { kitchenRouter } from "./routes/kitchen.routes.js";
@@ -47,6 +48,17 @@ export function createApp() {
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 600, standardHeaders: "draft-8", legacyHeaders: false, handler: limiterHandler }));
 
   app.get("/health", (_request, response) => {
+    response.status(200).json({
+      success: true,
+      data: {
+        status: "ok",
+        service: "emberserve-api",
+        timestamp: new Date().toISOString()
+      }
+    });
+  });
+
+  app.get("/health/ready", requireAuth, (_request, response) => {
     const database = databaseStatus();
     const healthy = database === "connected";
     response.status(healthy ? 200 : 503).json({
