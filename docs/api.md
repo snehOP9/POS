@@ -1,7 +1,15 @@
 # API contract
 
-Base URL: /api/v1. The API uses JSON and a versioned REST surface. The
-unauthenticated health endpoint is outside that prefix at /health.
+Base URL: /api/v1. The API uses JSON and a versioned REST surface. Health endpoints are outside that prefix.
+
+## Health and readiness
+
+| Method | Path | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | /health | Public | Minimal liveness response for load balancers and uptime checks. It does not expose dependency state. |
+| GET | /health/ready | Bearer token | Authenticated readiness/diagnostic response that includes database state. |
+
+The public liveness endpoint should remain safe to expose externally. Use the authenticated readiness endpoint when database dependency health is needed for diagnostics or operational checks.
 
 ## Authentication
 
@@ -78,37 +86,3 @@ establishes table context; it is not customer authentication.
 | Kitchen priority | PATCH /kitchen/tickets/:id/priority | Cashier with the required supervisor permission. |
 | Cashier | GET/POST /cashier/orders; PATCH /cashier/orders/:id/discount; GET /cashier/orders/:id/receipt | Cashier, with permission checks for restricted actions. |
 | Menu administration | POST /menu/categories; POST /menu/items; PATCH /menu/items/:id/availability | Cashier with the corresponding configuration/availability permission. |
-| Payments | POST /payments/cash; POST /payments/razorpay/order; POST /payments/razorpay/verify; POST /payments/:id/refund | Cash, refund, and provider actions are role/permission constrained. |
-| Shifts and reports | GET /shifts/current; POST /shifts/open; POST /shifts/close; GET /reports/summary | Cashier with the required shift/report permission. |
-| Notifications | GET /notifications; PATCH /notifications/:id/read | Authenticated account, scoped to its own notifications. |
-
-The Razorpay webhook is POST /api/v1/payments/razorpay/webhook. It receives
-the raw request body before JSON parsing so the provider signature can be
-verified.
-
-All request data is Zod-validated and writable fields are explicitly mapped.
-Order and item changes may require expectedVersion; callers must refetch and
-reconcile after a 409 conflict. Money is represented in integer paise.
-
-## Health and real-time
-
-GET /health returns 200 only when MongoDB is connected; otherwise it returns
-503 with a degraded status.
-
-~~~json
-{
-  "success": true,
-  "data": {
-    "status": "ok",
-    "service": "emberserve-api",
-    "database": "connected",
-    "timestamp": "2026-08-01T00:00:00.000Z"
-  }
-}
-~~~
-
-Socket.IO is served at /socket.io. The server authenticates the handshake
-access token and assigns restaurant-scoped role and account rooms itself; a
-client cannot choose its own room. Current emitted events are order:created,
-order:updated, ticket:created, ticket:updated, item:ready, table:updated,
-payment:updated, and notification:created.
