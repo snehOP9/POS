@@ -42,9 +42,13 @@ if (!parsedEnvironment.success) {
   throw new Error(`Invalid API environment configuration: ${issues}`);
 }
 
+const cookieSecure = parsedEnvironment.data.NODE_ENV === "production"
+  ? true
+  : parsedEnvironment.data.COOKIE_SECURE ?? false;
+
 export const env = {
   ...parsedEnvironment.data,
   clientUrls: parsedEnvironment.data.CLIENT_URL.split(",").map((url) => url.trim()).filter(Boolean),
-  cookieSecure: parsedEnvironment.data.COOKIE_SECURE ?? parsedEnvironment.data.NODE_ENV === "production",
+  cookieSecure,
   cookieDomain: parsedEnvironment.data.COOKIE_DOMAIN === "localhost" ? undefined : parsedEnvironment.data.COOKIE_DOMAIN
 } as const;
