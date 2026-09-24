@@ -141,6 +141,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
         if (isCurrentAttempt()) {
           setAccessToken();
           setSession(undefined);
+          setDemoMode(true);
         }
       } finally {
         if (isCurrentAttempt()) setAuthLoading(false);
