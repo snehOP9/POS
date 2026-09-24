@@ -15,7 +15,7 @@ function bearerToken(authorizationHeader: string | undefined): string {
   return token;
 }
 
-export const requireAuth: RequestHandler = asyncHandler(async (request, _response, _next) => {
+export const requireAuth: RequestHandler = asyncHandler(async (request, _response, next) => {
   const claims = verifyToken(bearerToken(request.header("authorization")), "access");
   const account = await AccountModel.findOne({
     _id: claims.sub,
@@ -34,6 +34,7 @@ export const requireAuth: RequestHandler = asyncHandler(async (request, _respons
     permissions: [...account.permissions],
     tokenVersion: account.tokenVersion
   };
+  next();
 });
 
 export function requireRole(...roles: Role[]): RequestHandler {

@@ -346,6 +346,11 @@ export async function transitionOrder(
 
   const previousStatus = order.status;
   order.status = input.status;
+  if (input.status === "SERVED") {
+    for (const item of order.items) {
+      if (item.status === "READY") item.status = "SERVED";
+    }
+  }
   appendStatusEvent(order, actor, previousStatus, input.status, input.note);
   if (input.status === "CANCELLED") {
     for (const item of order.items) {
