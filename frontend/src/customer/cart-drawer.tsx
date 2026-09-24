@@ -3,19 +3,27 @@ import { formatMoney } from "@/shared/lib/format";
 import { QuantityControl } from "@/shared/components/quantity-control";
 import { useDialogFocus } from "@/shared/hooks/useDialogFocus";
 import { usePos } from "@/shared/store/pos-store";
+import { cartLineLabels, cartLineTotal } from "@/shared/lib/cart";
 
 interface CartDrawerProps {
   checkoutLabel?: string;
   onCheckout?: () => void;
+  pickupDetails?: {
+    name: string;
+    phone: string;
+    onNameChange: (value: string) => void;
+    onPhoneChange: (value: string) => void;
+  };
 }
 
-export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout }: CartDrawerProps) => {
+export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout, pickupDetails }: CartDrawerProps) => {
   const {
     cart, cartOpen, setCartOpen, updateLineQuantity, clearCart,
-    cartSubtotal, cartTax, cartService, cartTotal,
+    cartSubtotal, cartTax, cartService, cartTotal, cartMode, pricing,
   } = usePos();
   const itemCount = cart.reduce((count, line) => count + line.quantity, 0);
   const drawerRef = useDialogFocus(cartOpen, () => setCartOpen(false));
+  const pickupIncomplete = cartMode === "PICKUP" && (!pickupDetails || pickupDetails.name.trim().length < 2 || pickupDetails.phone.replace(/\D/g, "").length < 5);
 
   if (!cartOpen) return null;
   return (
@@ -29,15 +37,16 @@ export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout }: CartDra
           {cart.length ? cart.map((line) => (
             <article className="cart-line" key={line.id}>
               <div className={`cart-line__swatch swatch--${line.item.color}`}>{line.item.glyph}</div>
-              <div className="cart-line__body"><strong>{line.item.name}</strong><span>{line.modifiers?.join(" · ") || "Kitchen standard"}</span><b>{formatMoney(line.item.price * line.quantity)}</b></div>
+              <div className="cart-line__body"><strong>{line.item.name}</strong><span>{cartLineLabels(line).join(" / ") || "Kitchen standard"}</span><b>{formatMoney(cartLineTotal(line))}</b></div>
               <QuantityControl quantity={line.quantity} onChange={(adjustment) => updateLineQuantity(line.id, adjustment)} compact />
             </article>
           )) : <div className="empty-state"><ShoppingBag size={30} /><strong>Your tray is ready for a favourite.</strong><span>Tap Add on any dish to begin.</span></div>}
         </div>
         {cart.length > 0 && <div className="cart-drawer__footer">
           <button type="button" className="quiet-button" onClick={clearCart}><Trash2 size={16} /> Clear tray</button>
-          <dl className="order-totals"><div><dt>Items</dt><dd>{formatMoney(cartSubtotal)}</dd></div><div><dt>Taxes</dt><dd>{formatMoney(cartTax)}</dd></div>{cartService > 0 && <div><dt>Service</dt><dd>{formatMoney(cartService)}</dd></div>}<div className="order-totals__total"><dt>Total</dt><dd>{formatMoney(cartTotal)}</dd></div></dl>
-          <button type="button" className="button button--saffron button--full" onClick={onCheckout}><span>{checkoutLabel}</span><ArrowRight size={18} /></button>
+           {cartMode === "PICKUP" && pickupDetails && <fieldset className="cart-checkout-details"><legend>Pickup contact</legend><label>Name<input value={pickupDetails.name} onChange={(event) => pickupDetails.onNameChange(event.target.value)} autoComplete="name" placeholder="Your name" /></label><label>Phone<input value={pickupDetails.phone} onChange={(event) => pickupDetails.onPhoneChange(event.target.value.replace(/[^0-9+ -]/g, ""))} autoComplete="tel" inputMode="tel" placeholder="Mobile number" /></label></fieldset>}
+          <dl className="order-totals"><div><dt>Items</dt><dd>{formatMoney(cartSubtotal)}</dd></div>{pricing.tax.enabled && <div><dt>{pricing.tax.inclusive ? "Tax included" : "Taxes"}</dt><dd>{formatMoney(cartTax)}</dd></div>}{cartService > 0 && <div><dt>Service</dt><dd>{formatMoney(cartService)}</dd></div>}<div className="order-totals__total"><dt>Total</dt><dd>{formatMoney(cartTotal)}</dd></div></dl>
+          <button type="button" className="button button--saffron button--full" onClick={onCheckout} disabled={pickupIncomplete}><span>{pickupIncomplete ? "Add pickup contact" : checkoutLabel}</span><ArrowRight size={18} /></button>
         </div>}
       </aside>
     </div>
