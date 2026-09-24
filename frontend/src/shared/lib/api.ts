@@ -2,10 +2,15 @@ import type { Role } from "@/shared/types/domain";
 
 type JsonRecord = Record<string, unknown>;
 
-const configuredUrl = import.meta.env.VITE_API_URL?.trim() || "http://localhost:4000";
-export const apiRoot = configuredUrl.replace(/\/$/, "").endsWith("/api/v1")
-  ? configuredUrl.replace(/\/$/, "")
-  : `${configuredUrl.replace(/\/$/, "")}/api/v1`;
+const configuredUrl = import.meta.env.VITE_API_URL?.trim();
+const isLocalBrowser = typeof window !== "undefined" && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+const resolvedUrl = configuredUrl || (isLocalBrowser ? "http://localhost:4000" : undefined);
+
+export const apiIsConfigured = Boolean(resolvedUrl);
+export const apiUnavailableMessage = "Live staff access is not configured on this site yet. Use Preview or run the local stack.";
+export const apiRoot = resolvedUrl
+  ? (resolvedUrl.replace(/\/$/, "").endsWith("/api/v1") ? resolvedUrl.replace(/\/$/, "") : `${resolvedUrl.replace(/\/$/, "")}/api/v1`)
+  : "";
 
 const sessionKey = "emberserve.session";
 
@@ -35,6 +40,10 @@ export class ApiError extends Error {
   }
 }
 
+const assertApiConfigured = (): void => {
+  if (!apiIsConfigured) throw new ApiError(apiUnavailableMessage, "API_NOT_CONFIGURED");
+};
+
 export interface AuthResponse {
   accessToken: string;
   user: { name: string; role: Role };
@@ -48,6 +57,7 @@ let refreshInFlight: Promise<AuthResponse> | undefined;
 
 const refreshAccessToken = (): Promise<AuthResponse> => {
   if (refreshInFlight) return refreshInFlight;
+  assertApiConfigured();
 
   refreshInFlight = fetch(`${apiRoot}/auth/refresh`, {
     method: "POST",
@@ -94,6 +104,7 @@ export async function apiRequest<T>(
   options: ApiRequestOptions = {},
 ): Promise<T> {
   const { token, headers, retriedAfterRefresh, ...requestOptions } = options;
+  assertApiConfigured();
   const response = await fetch(`${apiRoot}${path}`, {
     ...requestOptions,
     credentials: "include",
