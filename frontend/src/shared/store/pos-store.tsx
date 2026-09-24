@@ -122,6 +122,7 @@ interface PosStore {
   placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => void;
   startTicket: (ticketId: string) => void;
   markTicketItemReady: (ticketId: string, itemId: string) => void;
+  markTicketReady: (ticketId: string) => void;
   bumpTicket: (ticketId: string) => void;
   serveOrder: (orderId: string) => void;
   requestBill: (tableId: string) => void;
@@ -485,6 +486,32 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }).finally(() => setIsMutating(false));
   }, [demoMode, isMutating, notify, refreshOperations, tickets]);
 
+  const markTicketReady = useCallback((ticketId: string) => {
+    const ticket = tickets.find((candidate) => candidate.id === ticketId);
+    if (!ticket) return;
+    const items = ticket.items.map((item) => ({ ...item, status: "READY" as const }));
+    const apply = () => {
+      setTickets((current) => current.map((candidate) => candidate.id === ticketId ? { ...candidate, status: "ready", items } : candidate));
+      setOrders((current) => current.map((order) => {
+        if (order.id !== ticket.orderId) return order;
+        const nextItems = order.items.map((item) => items.find((update) => update.id === item.id) ?? item);
+        return { ...order, items: nextItems, status: orderStatusFromItems(nextItems) };
+      }));
+      setTables((current) => current.map((table) => table.orderId === ticket.orderId ? { ...table, status: "ready" } : table));
+      notify(`${ticket.displayId} is ready to serve.`, "success");
+      if (!demoMode) refreshOperations();
+    };
+    if (demoMode) { apply(); return; }
+    if (isMutating) return;
+    setIsMutating(true);
+    void Promise.all(ticket.items.filter((item) => item.status !== "READY").map((item) => api.kitchen.updateItem(ticketId, item.id, "READY")))
+      .then(() => api.kitchen.updateTicket(ticketId, "READY"))
+      .then(apply)
+      .catch((error: unknown) => {
+        notify(error instanceof ApiError ? error.message : "Ticket could not be marked ready.", "danger");
+      }).finally(() => setIsMutating(false));
+  }, [demoMode, isMutating, notify, refreshOperations, tickets]);
+
   const bumpTicket = useCallback((ticketId: string) => {
     const ticket = tickets.find((candidate) => candidate.id === ticketId);
     if (!ticket) return;
@@ -564,6 +591,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     restoreAttempt.current += 1;
     setAuthLoading(false);
     setDemoMode(preview);
+    if (preview) {
+      setMenu(previewMenuItems);
+      setPricing(fallbackRestaurantPricing);
+      setMenuError(undefined);
+      setMenuLoading(false);
+    }
     setSession({ role, name, accessToken, preview });
   }, []);
   const logout = useCallback(() => {
@@ -583,12 +616,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const value = useMemo<PosStore>(() => ({
     menu, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
     selectedTableId, toasts, session, authLoading, demoMode, isMutating, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
-    selectTable, adjustGuests, placeOrder, startTicket, markTicketItemReady, bumpTicket, serveOrder,
+    selectTable, adjustGuests, placeOrder, startTicket, markTicketItemReady, markTicketReady, bumpTicket, serveOrder,
     requestBill, settleOrder, notify, login, logout,
   }), [
     addToCart, adjustGuests, bumpTicket, cart, cartMode, cartOpen, cartService, cartSubtotal, cartTax,
     authLoading, cartTotal, clearCart, demoMode, isMutating, login, logout, markTicketItemReady, menu, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill,
-    selectedTableId, serveOrder, session, settleOrder, startTicket, tables, tickets, toasts, updateLineQuantity,
+    selectedTableId, serveOrder, session, settleOrder, startTicket, markTicketReady, tables, tickets, toasts, updateLineQuantity,
   ]);
 
   return <PosContext.Provider value={value}>{children}</PosContext.Provider>;

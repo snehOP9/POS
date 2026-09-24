@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { BarChart3, Bell, Check, ChevronDown, CircleHelp, Clock3, LayoutGrid, LockKeyhole, MenuSquare, MoreHorizontal, Plus, ReceiptText, Search, Settings2, ShoppingBasket, Table2, UtensilsCrossed, WalletCards } from "lucide-react";
 import { Brand } from "@/shared/components/brand";
 import { ConnectionBadge } from "@/shared/components/connection-badge";
@@ -19,12 +20,14 @@ const navItems = [
 export const CashierPage = () => {
   const {
     cart, cartSubtotal, cartTax, cartService, cartTotal, addToCart, updateLineQuantity,
-    clearCart, cartMode, setCartMode, tables, selectedTableId, selectTable, placeOrder, orders, menu, demoMode, isMutating, refreshOperations,
+    clearCart, cartMode, setCartMode, tables, selectedTableId, selectTable, placeOrder, orders, menu, demoMode, isMutating, refreshOperations, notify, logout,
   } = usePos();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [paymentMethod, setPaymentMethod] = useState<"Cash" | "Pay later">("Cash");
   const [cashTendered, setCashTendered] = useState("");
+  const [activeNav, setActiveNav] = useState("POS");
+  const navigate = useNavigate();
   const now = useClock(30_000);
   const live = useLiveUpdates(refreshOperations);
   useEffect(() => {
@@ -45,10 +48,16 @@ export const CashierPage = () => {
     setCashTendered("");
   };
 
+  const openCashierSection = (label: string) => {
+    setActiveNav(label);
+    if (label !== "POS") notify(`${label} is selected. Operational controls stay available in the live bill.`, "info");
+  };
+  const lockRegister = () => { logout(); navigate("/login"); };
+
   return <main className="cashier-page">
-    <aside className="cashier-sidebar"><Brand inverse /><nav aria-label="Cashier navigation">{navItems.map(([Icon, label, active]) => <button type="button" key={label} className={active ? "cashier-nav-item cashier-nav-item--active" : "cashier-nav-item"}><Icon size={19} /><span>{label}</span>{label === "Orders" && activeOrders > 0 && <b>{activeOrders}</b>}</button>)}</nav><div className="cashier-sidebar__footer"><button type="button" className="cashier-profile"><span>MC</span><div><strong>Maya Chen</strong><small>Cashier · Evening</small></div><MoreHorizontal size={18} /></button><button type="button" className="lock-button"><LockKeyhole size={17} /> Lock register</button></div></aside>
+    <aside className="cashier-sidebar"><Brand inverse /><nav aria-label="Cashier navigation">{navItems.map(([Icon, label]) => <button type="button" key={label} className={activeNav === label ? "cashier-nav-item cashier-nav-item--active" : "cashier-nav-item"} onClick={() => openCashierSection(label)}><Icon size={19} /><span>{label}</span>{label === "Orders" && activeOrders > 0 && <b>{activeOrders}</b>}</button>)}</nav><div className="cashier-sidebar__footer"><button type="button" className="cashier-profile" onClick={() => notify("Maya Chen, Cashier, evening shift.", "info")}><span>MC</span><div><strong>Maya Chen</strong><small>Cashier · Evening</small></div><MoreHorizontal size={18} /></button><button type="button" className="lock-button" onClick={lockRegister}><LockKeyhole size={17} /> Lock register</button></div></aside>
     <section className="cashier-workspace">
-      <header className="cashier-header"><div><span className="eyebrow">Register 01 · Evening shift</span><h1>New order <span>#{1086 + orders.length}</span></h1></div><div className="cashier-header__tools"><span className="cashier-time">{formatClock(new Date(now))}</span><ConnectionBadge live={live} /><button type="button" className="icon-button" aria-label="Notifications"><Bell size={19} /><b className="notification-dot" /></button><button type="button" className="icon-button" aria-label="Help"><CircleHelp size={19} /></button></div></header>
+      <header className="cashier-header"><div><span className="eyebrow">Register 01 · Evening shift</span><h1>New order <span>#{1086 + orders.length}</span></h1></div><div className="cashier-header__tools"><span className="cashier-time">{formatClock(new Date(now))}</span><ConnectionBadge live={live} /><button type="button" className="icon-button" aria-label="Notifications" onClick={() => notify(activeOrders ? `${activeOrders} open orders need attention.` : "No new cashier alerts.", "info")}><Bell size={19} /><b className="notification-dot" /></button><button type="button" className="icon-button" aria-label="Help" onClick={() => notify("Search, add items, choose settlement, then send the order to kitchen.", "info")}><CircleHelp size={19} /></button></div></header>
       <div className="cashier-body">
         <section className="cashier-products"><div className="cashier-products__top"><label className="search-field search-field--operational"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search menu, SKU or item" /><kbd>F2</kbd></label><span className="outline-button" aria-live="polite"><ShoppingBasket size={17} /> Open orders <b>{activeOrders}</b></span></div><div className="cashier-categories">{cashierCategories.map((category) => <button type="button" key={category} className={category === activeCategory ? "cashier-category cashier-category--active" : "cashier-category"} onClick={() => setActiveCategory(category)}>{category}</button>)}</div><div className="cashier-grid">{filteredItems.map((item) => <button type="button" className="cashier-product" key={item.id} onClick={() => addToCart(item)} disabled={item.unavailable}><FoodVisual item={item} size="mini" /><div><span className={`dietary-dot dietary-dot--${item.dietary}`} /><strong>{item.name}</strong><small>{item.unavailable ? "Unavailable" : `${item.prepMinutes} min`}</small></div><b>{formatMoney(item.price)}</b><span className="cashier-product__add"><Plus size={16} /></span></button>)}</div>{!filteredItems.length && <div className="empty-state"><UtensilsCrossed size={30} /><strong>No live menu items are available.</strong><span>Menu data appears here after the API responds.</span></div>}</section>
         <aside className="pos-bill"><div className="pos-bill__top"><div><span className="eyebrow">Live bill</span><h2>{cart.length ? `${cart.length} menu selections` : "Start a fresh bill"}</h2></div><button type="button" className="quiet-button quiet-button--danger" onClick={clearCart} disabled={!cart.length || isMutating}>Clear</button></div><div className="order-mode-row">{(["DINE_IN", "PICKUP", "COUNTER"] as DiningMode[]).map((mode) => <button key={mode} type="button" className={cartMode === mode ? "order-mode order-mode--active" : "order-mode"} onClick={() => setCartMode(mode)}>{mode === "DINE_IN" ? "Dine in" : mode === "PICKUP" ? "Pickup" : "Counter"}</button>)}</div>{cartMode === "DINE_IN" && tables.length > 0 && <label className="table-selector"><Table2 size={17} /><span>Serving</span><select value={selectedTableId} onChange={(event) => selectTable(event.target.value)}>{tables.map((table) => <option key={table.id} value={table.id}>{table.label} · {table.guests || "new"} guests</option>)}</select><ChevronDown size={16} /></label>}
