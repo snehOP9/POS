@@ -11,6 +11,7 @@ import { useLiveUpdates } from "@/shared/hooks/useLiveUpdates";
 import { useDialogFocus } from "@/shared/hooks/useDialogFocus";
 import { formatMoney } from "@/shared/lib/format";
 import { usePos } from "@/shared/store/pos-store";
+import { selectionForOption, unitPriceForSelection } from "@/shared/lib/cart";
 import type { MenuItem } from "@/shared/types/domain";
 import { useNavigate } from "react-router-dom";
 
@@ -39,19 +40,30 @@ const MenuCard = ({ item, onCustomize }: { item: MenuItem; onCustomize: (item: M
 const DishDialog = ({ item, onClose }: { item: MenuItem; onClose: () => void }) => {
   const { addToCart } = usePos();
   const dialogRef = useDialogFocus(true, onClose);
-  const [spice, setSpice] = useState("Kitchen standard");
-  const [extras, setExtras] = useState<string[]>([]);
-  const toggleExtra = (extra: string) => setExtras((current) => current.includes(extra) ? current.filter((value) => value !== extra) : [...current, extra]);
-  const modifiers = [spice, ...extras].filter((value) => value !== "Kitchen standard");
+  const [variantId, setVariantId] = useState(() => item.variants?.find((variant) => variant.available)?.id);
+  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
+  const variant = item.variants?.find((entry) => entry.id === variantId && entry.available);
+  const modifiers = (item.modifierGroups ?? []).flatMap((group) => group.options
+    .filter((option) => selectedOptionIds.includes(option.id))
+    .map((option) => selectionForOption(group, option)));
+  const selectionCount = (groupId: string) => modifiers.filter((modifier) => modifier.groupId === groupId).length;
+  const toggleOption = (group: NonNullable<MenuItem["modifierGroups"]>[number], optionId: string) => setSelectedOptionIds((current) => {
+    const selected = current.includes(optionId);
+    if (!selected && current.filter((id) => group.options.some((option) => option.id === id)).length >= group.maxSelections) return current;
+    return selected ? current.filter((id) => id !== optionId) : [...current, optionId];
+  });
+  const missingRequiredSelection = (item.modifierGroups ?? []).some((group) => selectionCount(group.id) < group.minSelections);
+  const total = unitPriceForSelection(item, { variant, modifiers });
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section className="dish-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="dish-dialog-title" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
         <button type="button" className="icon-button dish-dialog__close" onClick={onClose} aria-label="Close dish options"><X /></button>
         <FoodVisual item={item} size="feature" />
-        <div className="dish-dialog__details"><div className="eyebrow">Made for your table</div><h2 id="dish-dialog-title">{item.name}</h2><p>{item.description}</p><strong>{formatMoney(item.price)}</strong></div>
-        <fieldset className="option-group"><legend>Heat preference</legend><div className="choice-row">{["Mild", "Kitchen standard", "Extra chilli"].map((choice) => <label className={spice === choice ? "choice choice--selected" : "choice"} key={choice}><input type="radio" name="spice" checked={spice === choice} onChange={() => setSpice(choice)} />{choice}</label>)}</div></fieldset>
-        <fieldset className="option-group"><legend>Finish it your way</legend><div className="choice-stack">{["Add herb salad + ₹65", "Extra house chutney + ₹35"].map((extra) => <label className="checkbox-choice" key={extra}><input type="checkbox" checked={extras.includes(extra)} onChange={() => toggleExtra(extra)} /><span>{extra}</span></label>)}</div></fieldset>
-        <button type="button" className="button button--saffron button--full" onClick={() => { addToCart(item, modifiers); onClose(); }}><ShoppingBag size={18} /> Add to tray · {formatMoney(item.price)}</button>
+        <div className="dish-dialog__details"><div className="eyebrow">Made for your table</div><h2 id="dish-dialog-title">{item.name}</h2><p>{item.description}</p><strong>{formatMoney(total)}</strong></div>
+        {item.variants?.length ? <fieldset className="option-group"><legend>Choose a portion</legend><div className="choice-row">{item.variants.map((option) => <label className={variantId === option.id ? "choice choice--selected" : "choice"} key={option.id}><input type="radio" name={`variant-${item.id}`} checked={variantId === option.id} disabled={!option.available} onChange={() => setVariantId(option.id)} />{option.name}{option.priceDelta ? ` ? ${option.priceDelta > 0 ? "+" : ""}${formatMoney(option.priceDelta)}` : ""}</label>)}</div></fieldset> : null}
+        {(item.modifierGroups ?? []).map((group) => <fieldset className="option-group" key={group.id}><legend>{group.name}{group.minSelections ? ` choose at least ${group.minSelections}` : " optional"}</legend><div className="choice-stack">{group.options.map((option) => { const selected = selectedOptionIds.includes(option.id); const groupFull = selectionCount(group.id) >= group.maxSelections; return <label className="checkbox-choice" key={option.id}><input type="checkbox" checked={selected} disabled={!option.available || (!selected && groupFull)} onChange={() => toggleOption(group, option.id)} /><span>{option.name}{option.priceDelta ? ` ${option.priceDelta > 0 ? "+" : ""}${formatMoney(option.priceDelta)}` : ""}</span></label>; })}</div></fieldset>)}
+        <button type="button" className="button button--saffron button--full" disabled={missingRequiredSelection} onClick={() => { addToCart(item, { variant, modifiers }); onClose(); }}><ShoppingBag size={18} /> {missingRequiredSelection ? "Choose required options" : `Add to tray - ${formatMoney(total)}`}</button>
       </section>
     </div>
   );
@@ -64,6 +76,8 @@ export const MenuPage = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [vegetarian, setVegetarian] = useState(false);
   const [selectedDish, setSelectedDish] = useState<MenuItem>();
+  const [pickupName, setPickupName] = useState("");
+  const [pickupPhone, setPickupPhone] = useState("");
   const live = useLiveUpdates(refreshOperations);
 
   useEffect(() => {
@@ -100,7 +114,7 @@ export const MenuPage = () => {
     <section className="dining-note"><div className="dining-note__star"><Heart fill="currentColor" size={23} /></div><div><span className="eyebrow">A note from our kitchen</span><h2>We cook each order to the moment it’s called.</h2><p>Please let us know about allergies — the team will see your note before the fire starts.</p></div><div className="dining-mode"><span>How are you dining?</span><div>{(["DINE_IN", "PICKUP"] as const).map((mode) => <button key={mode} type="button" className={cartMode === mode ? "mode-pill mode-pill--active" : "mode-pill"} onClick={() => setCartMode(mode)}>{mode === "DINE_IN" ? "At my table" : "I’ll pick up"}</button>)}</div></div></section>
 
     {count > 0 && <button className="mobile-cart-bar" type="button" onClick={() => setCartOpen(true)}><ShoppingBag size={19} /><span>{count} {count === 1 ? "item" : "items"}</span><strong>View tray</strong></button>}
-    <CartDrawer checkoutLabel={cartMode === "DINE_IN" ? "Send to kitchen" : "Place pickup order"} onCheckout={() => { if (!session || session.role !== "CUSTOMER") { navigate("/login", { state: { from: "/menu" } }); return; } placeOrder("customer"); }} />
+    <CartDrawer checkoutLabel={cartMode === "DINE_IN" ? "Send to kitchen" : "Place pickup order"} pickupDetails={{ name: pickupName, phone: pickupPhone, onNameChange: setPickupName, onPhoneChange: setPickupPhone }} onCheckout={() => { if (!session || session.role !== "CUSTOMER") { navigate("/login", { state: { from: "/menu" } }); return; } placeOrder("customer", "UNPAID", undefined, { name: pickupName.trim(), phone: pickupPhone.trim() }); }} />
     {selectedDish && <DishDialog item={selectedDish} onClose={() => setSelectedDish(undefined)} />}
   </main>;
 };

@@ -13,13 +13,22 @@ function duplicateKeyError(error: unknown): error is { code: number; keyValue?: 
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === 11000;
 }
 
+function malformedJsonError(error: unknown): boolean {
+  if (!(error instanceof SyntaxError) || typeof error !== "object" || error === null) return false;
+  const parserError = error as SyntaxError & { status?: unknown; type?: unknown };
+  return parserError.status === 400 && parserError.type === "entity.parse.failed";
+}
+
 export const errorHandler: ErrorRequestHandler = (error: unknown, request, response, _next) => {
+
   let normalized: AppError;
 
   if (error instanceof AppError) {
     normalized = error;
   } else if (error instanceof mongoose.Error.ValidationError) {
     normalized = new AppError(400, "DATABASE_VALIDATION_ERROR", "Stored data validation failed");
+  } else if (malformedJsonError(error)) {
+    normalized = new AppError(400, "INVALID_JSON", "The request body must contain valid JSON");
   } else if (error instanceof mongoose.Error.CastError) {
     normalized = new AppError(400, "INVALID_IDENTIFIER", "A resource identifier is invalid");
   } else if (error instanceof mongoose.Error.VersionError) {
