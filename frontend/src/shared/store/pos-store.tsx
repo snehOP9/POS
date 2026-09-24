@@ -10,7 +10,7 @@ import {
 } from "react";
 import { ApiError, api, getAccessToken, setAccessToken } from "@/shared/lib/api";
 import { initialOrders, initialTables, initialTickets, menuItems as previewMenuItems } from "@/shared/data/demo";
-import { normalizeMenuPayload } from "@/shared/lib/menu-adapter";
+import { normalizeMenuPayload, normalizeRestaurantPricing } from "@/shared/lib/menu-adapter";
 import { normalizeOrders, normalizeTables, normalizeTickets } from "@/shared/lib/operations-adapter";
 import type {
   AuthSession,
@@ -23,15 +23,40 @@ import type {
   Order,
   OrderItem,
   Role,
+  RestaurantPricingConfig,
   ToastMessage,
 } from "@/shared/types/domain";
 
-const cartStorageKey = "emberserve.customer-cart";
+import { calculateCartPricing, cartLineLabels, cartLineTotal, cartLineUnitPrice, cartSelectionKey, fallbackRestaurantPricing, type CartSelection } from "@/shared/lib/cart";
+const cartStorageKey = "emberserve.customer-cart:v2";
+const legacyCartStorageKey = "emberserve.customer-cart";
 
 const readStoredCart = (): CartLine[] => {
   try {
-    const stored = localStorage.getItem(cartStorageKey);
-    return stored ? (JSON.parse(stored) as CartLine[]) : [];
+    const stored = localStorage.getItem(cartStorageKey) ?? localStorage.getItem(legacyCartStorageKey);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((raw) => {
+      if (typeof raw !== "object" || raw === null) return [];
+      const record = raw as Record<string, unknown>;
+      if (typeof record.id !== "string" || typeof record.quantity !== "number" || typeof record.item !== "object" || record.item === null) return [];
+      const rawVariant = record.variant;
+      const variant = typeof rawVariant === "object" && rawVariant !== null && typeof (rawVariant as Record<string, unknown>).id === "string"
+        ? rawVariant as CartLine["variant"]
+        : undefined;
+      const modifiers = Array.isArray(record.modifiers)
+        ? record.modifiers.filter((modifier) => typeof modifier === "object" && modifier !== null && typeof (modifier as Record<string, unknown>).id === "string") as NonNullable<CartLine["modifiers"]>
+        : [];
+      return [{
+        id: record.id,
+        item: record.item as MenuItem,
+        quantity: Math.max(1, Math.min(99, Math.trunc(record.quantity))),
+        ...(typeof record.note === "string" ? { note: record.note } : {}),
+        ...(variant ? { variant } : {}),
+        modifiers,
+      }];
+    });
   } catch {
     return [];
   }
@@ -67,6 +92,7 @@ const readResponseId = (value: unknown): string | undefined => {
 interface PosStore {
   menu: MenuItem[];
   menuLoading: boolean;
+  pricing: RestaurantPricingConfig;
   menuError?: string;
   refreshMenu: () => void;
   refreshOperations: () => void;
@@ -86,14 +112,14 @@ interface PosStore {
   authLoading: boolean;
   demoMode: boolean;
   isMutating: boolean;
-  addToCart: (item: MenuItem, modifiers?: string[]) => void;
+  addToCart: (item: MenuItem, selection?: CartSelection) => void;
   updateLineQuantity: (lineId: string, adjustment: number) => void;
   clearCart: () => void;
   setCartMode: (mode: DiningMode) => void;
   setCartOpen: (open: boolean) => void;
   selectTable: (tableId: string) => void;
   adjustGuests: (tableId: string, adjustment: number) => void;
-  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID") => void;
+  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => void;
   startTicket: (ticketId: string) => void;
   markTicketItemReady: (ticketId: string, itemId: string) => void;
   bumpTicket: (ticketId: string) => void;
@@ -113,6 +139,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const [cartOpen, setCartOpen] = useState(false);
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [menuLoading, setMenuLoading] = useState(true);
+  const [pricing, setPricing] = useState<RestaurantPricingConfig>(fallbackRestaurantPricing);
   const [menuError, setMenuError] = useState<string>();
   const [tables, setTables] = useState<DiningTable[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -155,7 +182,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+    try {
+      localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+      localStorage.removeItem(legacyCartStorageKey);
+    } catch {
+      // Cart persistence is progressive enhancement; order creation still uses in-memory state.
+    }
   }, [cart]);
 
   const notify = useCallback((message: string, tone: ToastMessage["tone"] = "success") => {
@@ -170,6 +202,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     if (demoMode) {
       setMenu(previewMenuItems);
       setMenuError(undefined);
+      setPricing(fallbackRestaurantPricing);
       setMenuLoading(false);
       return;
     }
@@ -178,6 +211,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     void api.menu.getPublic({ available: true }).then((payload) => {
       const nextMenu = normalizeMenuPayload(payload);
       setMenu(nextMenu);
+      setPricing(normalizeRestaurantPricing(payload));
       if (!nextMenu.length) setMenuError("The restaurant has no available menu items right now.");
     }).catch((error: unknown) => {
       setMenu([]);
@@ -234,19 +268,26 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     setTickets([]);
   }, [demoMode]);
 
-  const addToCart = useCallback((item: MenuItem, modifiers: string[] = []) => {
+  const addToCart = useCallback((item: MenuItem, selection: CartSelection = {}) => {
     if (item.unavailable) {
       notify(`${item.name} is unavailable right now.`, "danger");
       return;
     }
+    if (selection.variant && !selection.variant.available) {
+      notify(`${selection.variant.name} is unavailable right now.`, "danger");
+      return;
+    }
+    if (selection.modifiers?.some((modifier) => !modifier.available)) {
+      notify("One of the selected options is unavailable right now.", "danger");
+      return;
+    }
+    const selectedKey = cartSelectionKey(item, selection);
     setCart((current) => {
-      const existing = current.find(
-        (line) => line.item.id === item.id && line.modifiers?.join("|") === modifiers.join("|"),
-      );
+      const existing = current.find((line) => cartSelectionKey(line.item, line) === selectedKey);
       if (existing) {
         return current.map((line) => line.id === existing.id ? { ...line, quantity: line.quantity + 1 } : line);
       }
-      return [...current, { id: `${item.id}-${Date.now()}`, item, quantity: 1, modifiers }];
+      return [...current, { id: `${item.id}-${Date.now()}`, item, quantity: 1, variant: selection.variant, modifiers: selection.modifiers ?? [] }];
     });
     notify(`${item.name} added to order.`, "info");
   }, [notify]);
@@ -278,7 +319,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }));
   }, [demoMode, notify]);
 
-  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID") => {
+  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => {
     if (!cart.length) {
       notify("Add something delicious before placing an order.", "danger");
       return;
@@ -288,23 +329,21 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     const table = tables.find((candidate) => candidate.id === selectedTableId);
     const numericId = 1050 + orders.length;
     const orderId = `ord-${numericId}-${Date.now()}`;
-    const subtotal = cart.reduce((sum, line) => sum + line.item.price * line.quantity, 0);
-    const tax = Math.round(subtotal * 0.05);
-    const service = cartMode === "DINE_IN" ? Math.round(subtotal * 0.05) : 0;
-    const total = subtotal + tax + service;
+    const projectedPricing = calculateCartPricing(cart.reduce((sum, line) => sum + cartLineTotal(line), 0), pricing);
+    const total = projectedPricing.total;
     const orderItems: OrderItem[] = cart.map((line) => ({
       id: `${line.id}-order`,
       name: line.item.name,
       quantity: line.quantity,
-      price: line.item.price,
+      price: cartLineUnitPrice(line),
       status: "PENDING",
-      modifiers: line.modifiers,
+      modifiers: cartLineLabels(line),
       note: line.note,
     }));
     const createdOrder: Order = {
       id: orderId,
       displayId: `#${numericId}`,
-      tableLabel: cartMode === "DINE_IN" ? (table?.label ?? "Table") : cartMode === "PICKUP" ? "Pickup - Guest" : "Counter walk-in",
+      tableLabel: cartMode === "DINE_IN" ? (table?.label ?? "Table") : cartMode === "PICKUP" ? `Pickup - ${pickup?.name || "Guest"}` : "Counter walk-in",
       mode: cartMode,
       status: "CONFIRMED",
       paymentStatus: payment === "PAID" ? "PAYMENT_PENDING" : "UNPAID",
@@ -351,8 +390,9 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     const requestPayload = {
       mode: cartMode,
       tableId: cartMode === "DINE_IN" && table ? selectedTableId : undefined,
-      guestName: cartMode === "PICKUP" ? "Guest" : undefined,
-      items: cart.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity, modifierOptionIds: [], note: line.note })),
+      guestName: cartMode === "PICKUP" ? pickup?.name || "Guest" : undefined,
+      guestPhone: cartMode === "PICKUP" ? pickup?.phone : undefined,
+      items: cart.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity, variantId: line.variant?.id, modifierOptionIds: line.modifiers?.map((modifier) => modifier.id) ?? [], note: line.note })),
     };
 
     if (demoMode) {
@@ -377,7 +417,11 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
         return;
       }
       try {
-        await api.payments.cash({ orderId: persistedId, cashReceivedPaise: Math.round(total * 100) });
+        if (typeof cashReceivedPaise !== "number") {
+          commitOrder(persistedOrder, `${persistedOrder.displayId} was created and awaits settlement.`, "info");
+          return;
+        }
+        await api.payments.cash({ orderId: persistedId, cashReceivedPaise });
         commitOrder({ ...persistedOrder, paymentStatus: "PAID" }, `${persistedOrder.displayId} paid and sent to kitchen.`);
       } catch (error) {
         commitOrder({ ...persistedOrder, paymentStatus: "PAYMENT_PENDING" }, `${persistedOrder.displayId} was created, but cash settlement needs attention.`, "danger");
@@ -387,7 +431,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       const message = error instanceof ApiError ? error.message : "The API is unavailable. Your order has not been created.";
       notify(message, "danger");
     }).finally(() => setIsMutating(false));
-  }, [cart, cartMode, demoMode, isMutating, notify, orders.length, refreshOperations, selectedTableId, tables]);
+  }, [cart, cartMode, demoMode, isMutating, notify, orders.length, pricing, refreshOperations, selectedTableId, tables]);
 
   const startTicket = useCallback((ticketId: string) => {
     const ticket = tickets.find((candidate) => candidate.id === ticketId);
@@ -531,19 +575,19 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     setSession(undefined);
   }, [demoMode]);
 
-  const cartSubtotal = cart.reduce((sum, line) => sum + line.item.price * line.quantity, 0);
-  const cartTax = Math.round(cartSubtotal * 0.05);
-  const cartService = cartMode === "DINE_IN" ? Math.round(cartSubtotal * 0.05) : 0;
-  const cartTotal = cartSubtotal + cartTax + cartService;
+  const { subtotal: cartSubtotal, tax: cartTax, service: cartService, total: cartTotal } = calculateCartPricing(
+    cart.reduce((sum, line) => sum + cartLineTotal(line), 0),
+    pricing,
+  );
 
   const value = useMemo<PosStore>(() => ({
-    menu, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
+    menu, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
     selectedTableId, toasts, session, authLoading, demoMode, isMutating, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
     selectTable, adjustGuests, placeOrder, startTicket, markTicketItemReady, bumpTicket, serveOrder,
     requestBill, settleOrder, notify, login, logout,
   }), [
     addToCart, adjustGuests, bumpTicket, cart, cartMode, cartOpen, cartService, cartSubtotal, cartTax,
-    authLoading, cartTotal, clearCart, demoMode, isMutating, login, logout, markTicketItemReady, menu, menuError, menuLoading, notify, orders, placeOrder, refreshMenu, requestBill,
+    authLoading, cartTotal, clearCart, demoMode, isMutating, login, logout, markTicketItemReady, menu, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill,
     selectedTableId, serveOrder, session, settleOrder, startTicket, tables, tickets, toasts, updateLineQuantity,
   ]);
 

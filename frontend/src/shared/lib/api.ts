@@ -127,7 +127,6 @@ export async function apiRequest<T>(
 export interface LoginPayload {
   email: string;
   password: string;
-  role?: Role;
 }
 
 export type LoginResponse = AuthResponse;

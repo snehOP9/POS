@@ -19,6 +19,46 @@ export type PaymentStatus = "UNPAID" | "PAYMENT_PENDING" | "PARTIALLY_PAID" | "P
 export type DiningMode = "DINE_IN" | "PICKUP" | "COUNTER";
 export type KitchenStation = "Hot" | "Tandoor" | "Cold" | "Bar";
 
+
+export interface RestaurantPricingConfig {
+  currency: string;
+  tax: {
+    enabled: boolean;
+    rateBasisPoints: number;
+    inclusive: boolean;
+  };
+  serviceCharge: {
+    enabled: boolean;
+    rateBasisPoints: number;
+  };
+}
+
+export interface MenuVariant {
+  id: string;
+  name: string;
+  priceDelta: number;
+  available: boolean;
+}
+
+export interface MenuModifierOption {
+  id: string;
+  name: string;
+  priceDelta: number;
+  available: boolean;
+}
+
+export interface MenuModifierGroup {
+  id: string;
+  name: string;
+  minSelections: number;
+  maxSelections: number;
+  options: MenuModifierOption[];
+}
+
+export interface CartModifierSelection extends MenuModifierOption {
+  groupId: string;
+  groupName: string;
+}
 export interface MenuItem {
   id: string;
   name: string;
@@ -34,6 +74,8 @@ export interface MenuItem {
   color: string;
   glyph: string;
   tags: string[];
+  variants?: MenuVariant[];
+  modifierGroups?: MenuModifierGroup[];
 }
 
 export interface CartLine {
@@ -41,7 +83,8 @@ export interface CartLine {
   item: MenuItem;
   quantity: number;
   note?: string;
-  modifiers?: string[];
+  variant?: MenuVariant;
+  modifiers?: CartModifierSelection[];
 }
 
 export interface DiningTable {
