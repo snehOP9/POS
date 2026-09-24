@@ -1,7 +1,15 @@
 # API contract
 
-Base URL: /api/v1. The API uses JSON and a versioned REST surface. The
-unauthenticated health endpoint is outside that prefix at /health.
+Base URL: /api/v1. The API uses JSON and a versioned REST surface. Health endpoints are outside that prefix.
+
+## Health and readiness
+
+| Method | Path | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | /health | Public | Minimal liveness response for load balancers and uptime checks. It does not expose dependency state. |
+| GET | /health/ready | Bearer token | Authenticated readiness/diagnostic response that includes database state. |
+
+The public liveness endpoint should remain safe to expose externally. Use the authenticated readiness endpoint when database dependency health is needed for diagnostics or operational checks.
 
 ## Authentication
 
@@ -92,8 +100,9 @@ reconcile after a 409 conflict. Money is represented in integer paise.
 
 ## Health and real-time
 
-GET /health returns 200 only when MongoDB is connected; otherwise it returns
-503 with a degraded status.
+GET /health is a public liveness check and does not expose MongoDB state.
+GET /health/ready requires a Bearer token and reports MongoDB readiness,
+returning 200 when connected and 503 otherwise.
 
 ~~~json
 {
@@ -101,7 +110,6 @@ GET /health returns 200 only when MongoDB is connected; otherwise it returns
   "data": {
     "status": "ok",
     "service": "emberserve-api",
-    "database": "connected",
     "timestamp": "2026-08-01T00:00:00.000Z"
   }
 }
