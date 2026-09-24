@@ -1,4 +1,5 @@
-import type { KitchenStation, MenuItem } from "@/shared/types/domain";
+import type { KitchenStation, MenuItem, MenuModifierGroup, MenuModifierOption, MenuVariant, RestaurantPricingConfig } from "@/shared/types/domain";
+import { fallbackRestaurantPricing } from "@/shared/lib/cart";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -19,6 +20,49 @@ const toStation = (value: unknown): KitchenStation => {
 };
 
 const colorWheel = ["butter", "mushroom", "prawn", "millet", "kokum", "paneer", "kheer", "lamb"];
+
+const variants = (value: unknown): MenuVariant[] => Array.isArray(value) ? value.flatMap((raw) => {
+  const variant = asRecord(raw);
+  if (!variant || typeof variant.id !== "string" || typeof variant.name !== "string") return [];
+  return [{ id: variant.id, name: variant.name, priceDelta: typeof variant.priceDeltaPaise === "number" ? variant.priceDeltaPaise / 100 : readNumber(variant.priceDelta, 0), available: variant.available !== false }];
+}) : [];
+
+const modifierOptions = (value: unknown): MenuModifierOption[] => Array.isArray(value) ? value.flatMap((raw) => {
+  const option = asRecord(raw);
+  if (!option || typeof option.id !== "string" || typeof option.name !== "string") return [];
+  return [{ id: option.id, name: option.name, priceDelta: typeof option.priceDeltaPaise === "number" ? option.priceDeltaPaise / 100 : readNumber(option.priceDelta, 0), available: option.available !== false }];
+}) : [];
+
+const modifierGroups = (value: unknown): MenuModifierGroup[] => Array.isArray(value) ? value.flatMap((raw) => {
+  const group = asRecord(raw);
+  if (!group || typeof group.id !== "string" || typeof group.name !== "string") return [];
+  return [{
+    id: group.id,
+    name: group.name,
+    minSelections: Math.max(0, readNumber(group.minSelections, 0)),
+    maxSelections: Math.max(0, readNumber(group.maxSelections, 1)),
+    options: modifierOptions(group.options),
+  }];
+}) : [];
+
+export const normalizeRestaurantPricing = (payload: unknown): RestaurantPricingConfig => {
+  const data = asRecord(payload);
+  const restaurant = asRecord(data?.restaurant);
+  const tax = asRecord(restaurant?.tax);
+  const serviceCharge = asRecord(restaurant?.serviceCharge);
+  return {
+    currency: readString(restaurant?.currency, fallbackRestaurantPricing.currency),
+    tax: {
+      enabled: tax?.enabled === true,
+      rateBasisPoints: Math.max(0, Math.min(10_000, readNumber(tax?.rateBasisPoints, fallbackRestaurantPricing.tax.rateBasisPoints))),
+      inclusive: tax?.inclusive === true,
+    },
+    serviceCharge: {
+      enabled: serviceCharge?.enabled === true,
+      rateBasisPoints: Math.max(0, Math.min(10_000, readNumber(serviceCharge?.rateBasisPoints, fallbackRestaurantPricing.serviceCharge.rateBasisPoints))),
+    },
+  };
+};
 
 export const normalizeMenuPayload = (payload: unknown): MenuItem[] => {
   const data = asRecord(payload);
@@ -47,6 +91,8 @@ export const normalizeMenuPayload = (payload: unknown): MenuItem[] => {
       color: colorWheel[index % colorWheel.length],
       glyph: readString(item.name, "D").slice(0, 1).toUpperCase(),
       tags,
+      variants: variants(item.variants),
+      modifierGroups: modifierGroups(item.modifierGroups),
     }];
   });
 };
