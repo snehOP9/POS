@@ -40,8 +40,8 @@ const paymentSchema = new Schema<Payment>(
   { timestamps: true, versionKey: "version" }
 );
 
-paymentSchema.index({ restaurantId: 1, providerOrderId: 1 }, { unique: true, sparse: true });
-paymentSchema.index({ restaurantId: 1, providerPaymentId: 1 }, { unique: true, sparse: true });
+paymentSchema.index({ restaurantId: 1, providerOrderId: 1 }, { unique: true, partialFilterExpression: { providerOrderId: { $type: "string" } } });
+paymentSchema.index({ restaurantId: 1, providerPaymentId: 1 }, { unique: true, partialFilterExpression: { providerPaymentId: { $type: "string" } } });
 paymentSchema.index({ restaurantId: 1, orderId: 1, status: 1 });
 
 export const PaymentModel = model<Payment>("Payment", paymentSchema);
