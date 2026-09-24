@@ -75,7 +75,7 @@ export const MenuPage = () => {
     const query = search.trim().toLowerCase();
     const matchesSearch = !query || `${item.name} ${item.description} ${item.tags.join(" ")}`.toLowerCase().includes(query);
     return matchesCategory && matchesSearch && (!vegetarian || item.dietary !== "non-veg");
-  }), [activeCategory, items, search, vegetarian]);
+  }), [activeCategory, displayItems, search, vegetarian]);
   const featured = items.filter((item) => item.featured).slice(0, 4);
   const activeCategories = ["All", ...new Set(items.map((item) => item.category))];
   const latestOrder = orders.find((order) => order.status !== "COMPLETED");
