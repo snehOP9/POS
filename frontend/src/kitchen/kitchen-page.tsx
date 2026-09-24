@@ -19,7 +19,7 @@ const columnInfo: Record<TicketColumn, { title: string; subtitle: string }> = {
 };
 
 const KitchenTicketCard = ({ ticket, now }: { ticket: KitchenTicket; now: number }) => {
-  const { startTicket, markTicketItemReady, bumpTicket } = usePos();
+  const { startTicket, markTicketItemReady, markTicketReady, bumpTicket } = usePos();
   const elapsed = formatElapsed(ticket.startedAt, now);
   const isUrgent = ticket.priority === "rush" || (now - new Date(ticket.startedAt).getTime()) / 60_000 >= 20;
   const completeCount = ticket.items.filter((item) => item.status === "READY").length;
@@ -28,7 +28,7 @@ const KitchenTicketCard = ({ ticket, now }: { ticket: KitchenTicket; now: number
     <div className="kitchen-ticket__badges"><StatusPill status={ticket.status} subtle />{ticket.priority !== "normal" && <span className={`priority-badge priority-badge--${ticket.priority}`}>{ticket.priority === "rush" ? "Rush" : "Re-fire"}</span>}<span className="station-badge">{ticket.station}</span></div>
     {ticket.note && <p className="ticket-allergy-note"><Bell size={15} /> {ticket.note}</p>}
     <div className="ticket-items">{ticket.items.map((item) => <div className={`ticket-item ticket-item--${item.status.toLowerCase()}`} key={item.id}><span className="ticket-item__quantity">{item.quantity}</span><div><strong>{item.name}</strong>{item.modifiers?.map((modifier) => <small key={modifier}>↳ {modifier}</small>)}{item.note && <small>↳ {item.note}</small>}</div>{item.status === "READY" ? <Check className="ticket-item__ready" size={19} /> : ticket.status !== "new" ? <button type="button" className="ticket-item__action" onClick={() => markTicketItemReady(ticket.id, item.id)}>Ready</button> : null}</div>)}</div>
-    <footer className="kitchen-ticket__footer">{ticket.status === "new" && <button type="button" className="kitchen-action kitchen-action--start" onClick={() => startTicket(ticket.id)}><Flame size={18} /> Start cooking <MoveRight size={17} /></button>}{ticket.status === "preparing" && <button type="button" className="kitchen-action kitchen-action--ready" onClick={() => ticket.items.filter((item) => item.status !== "READY").forEach((item) => markTicketItemReady(ticket.id, item.id))}><Check size={18} /> Mark all ready <span>{completeCount}/{ticket.items.length}</span></button>}{ticket.status === "ready" && <button type="button" className="kitchen-action kitchen-action--bump" onClick={() => bumpTicket(ticket.id)}><Check size={18} /> Bump ticket <MoveRight size={17} /></button>}</footer>
+    <footer className="kitchen-ticket__footer">{ticket.status === "new" && <button type="button" className="kitchen-action kitchen-action--start" onClick={() => startTicket(ticket.id)}><Flame size={18} /> Start cooking <MoveRight size={17} /></button>}{ticket.status === "preparing" && <button type="button" className="kitchen-action kitchen-action--ready" onClick={() => markTicketReady(ticket.id)}><Check size={18} /> Mark all ready <span>{completeCount}/{ticket.items.length}</span></button>}{ticket.status === "ready" && <button type="button" className="kitchen-action kitchen-action--bump" onClick={() => bumpTicket(ticket.id)}><Check size={18} /> Bump ticket <MoveRight size={17} /></button>}</footer>
   </article>;
 };
 
