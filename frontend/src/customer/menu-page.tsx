@@ -70,7 +70,9 @@ export const MenuPage = () => {
     if (!demoMode && cartMode === "DINE_IN") setCartMode("PICKUP");
   }, [cartMode, demoMode, setCartMode]);
 
-  const displayItems = items.length ? items : menuError ? previewMenuItems : items;\n  const usingPreviewFallback = !items.length && Boolean(menuError);\n  const visibleItems = useMemo(() => displayItems.filter((item) => {
+  const displayItems = items.length ? items : menuError ? previewMenuItems : items;
+  const usingPreviewFallback = !items.length && Boolean(menuError);
+  const visibleItems = useMemo(() => displayItems.filter((item) => {
     const matchesCategory = activeCategory === "All" || item.category === activeCategory;
     const query = search.trim().toLowerCase();
     const matchesSearch = !query || `${item.name} ${item.description} ${item.tags.join(" ")}`.toLowerCase().includes(query);
