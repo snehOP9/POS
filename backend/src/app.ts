@@ -47,14 +47,23 @@ export function createApp() {
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 600, standardHeaders: "draft-8", legacyHeaders: false, handler: limiterHandler }));
 
   app.get("/health", (_request, response) => {
-    const database = databaseStatus();
-    const healthy = database === "connected";
-    response.status(healthy ? 200 : 503).json({
-      success: healthy,
+    response.status(200).json({
+      success: true,
       data: {
-        status: healthy ? "ok" : "degraded",
+        status: "ok",
         service: "emberserve-api",
-        database,
+        timestamp: new Date().toISOString()
+      }
+    });
+  });
+
+  app.get("/ready", (_request, response) => {
+    const ready = databaseStatus() === "connected";
+    response.status(ready ? 200 : 503).json({
+      success: ready,
+      data: {
+        status: ready ? "ready" : "not_ready",
+        service: "emberserve-api",
         timestamp: new Date().toISOString()
       }
     });
