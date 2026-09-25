@@ -9,7 +9,9 @@
 | Production | Restaurant operation | HTTPS, managed/secured MongoDB, secret manager, backups, monitoring, and tested rollback. |
 
 Do not promote a development database, test secret, seeded password, or
-unreviewed container directly to production.
+unreviewed container directly to production. Start production configuration
+from `.env.production.example` in a secret manager, replace every placeholder,
+and keep the resulting values out of Git and build logs.
 
 ## Local Docker stack
 
