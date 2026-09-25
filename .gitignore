@@ -4,6 +4,7 @@ coverage/
 .vite/
 .env
 .env.local
+.env.production.local
 !.env.example
 !.env.production.example
 uploads/
