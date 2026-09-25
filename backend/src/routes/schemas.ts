@@ -175,6 +175,12 @@ export const tableOpenRequestSchema = z.object({
   query: blank
 });
 
+export const tableSessionUpdateRequestSchema = z.object({
+  body: z.object({ guestCount: z.number().int().min(1).max(50), note: z.string().trim().max(500).optional() }).strict(),
+  params: z.object({ id: objectIdSchema }),
+  query: blank
+});
+
 export const kitchenQuerySchema = z.object({
   body: optionalBlank,
   params: blank,

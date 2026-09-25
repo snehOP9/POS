@@ -79,6 +79,9 @@ export const normalizeTables = (payload: unknown, orders: Order[] = []): DiningT
     total: order?.total ?? 0,
     orderId: order?.id,
     waiter: "Assigned waiter",
+    sessionId: text(session?.id ?? session?._id) || undefined,
+    sessionOpenedAt: openedAt || undefined,
+    sessionNote: typeof session?.notes === "string" ? session.notes : undefined,
   }];
 });
 

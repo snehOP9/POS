@@ -98,6 +98,9 @@ export interface DiningTable {
   total: number;
   orderId?: string;
   waiter: string;
+  sessionId?: string;
+  sessionOpenedAt?: string;
+  sessionNote?: string;
 }
 
 export interface OrderItem {
