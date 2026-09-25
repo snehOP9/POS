@@ -122,7 +122,7 @@ interface PosStore {
   openTableSession: (tableId: string, guestCount: number, note?: string) => void;
   updateTableSession: (tableId: string, guestCount: number, note?: string) => void;
   closeTableSession: (tableId: string) => void;
-  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => void;
+  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number) => void;
   startTicket: (ticketId: string) => void;
   markTicketItemReady: (ticketId: string, itemId: string) => void;
   markTicketReady: (ticketId: string) => void;
@@ -386,7 +386,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }).finally(() => setIsMutating(false));
   }, [demoMode, isMutating, notify, refreshOperations, tables]);
 
-  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => {
+  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number) => {
     if (!cart.length) {
       notify("Add something delicious before placing an order.", "danger");
       return;
@@ -443,7 +443,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (demoMode && cartMode === "DINE_IN" && table) {
         setTables((current) => current.map((candidate) => candidate.id === table.id ? {
           ...candidate,
-          guests: candidate.guests || Math.min(2, candidate.seats),
+          guests: candidate.guests || Math.min(guestCount ?? 2, candidate.seats),
           status: "seated",
           total: candidate.total + total,
           orderId: order.id,
@@ -457,6 +457,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     const requestPayload = {
       mode: cartMode,
       tableId: cartMode === "DINE_IN" && table ? selectedTableId : undefined,
+      guestCount: cartMode === "DINE_IN" ? guestCount : undefined,
       guestName: cartMode === "PICKUP" ? pickup?.name || "Guest" : undefined,
       guestPhone: cartMode === "PICKUP" ? pickup?.phone : undefined,
       items: cart.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity, variantId: line.variant?.id, modifierOptionIds: line.modifiers?.map((modifier) => modifier.id) ?? [], note: line.note })),
