@@ -5,6 +5,7 @@ import type { KitchenTicket } from "../models/KitchenTicket.js";
 import type { Order } from "../models/Order.js";
 import type { Payment } from "../models/Payment.js";
 import type { Shift } from "../models/Shift.js";
+import type { TableSession } from "../models/TableSession.js";
 
 type Identified<T> = T & { _id: Types.ObjectId };
 
@@ -147,6 +148,14 @@ export function serializeTable(table: Identified<DiningTable>) {
   };
 }
 
+export function serializeTableSession(session: Identified<TableSession>) {
+  return {
+    id: session._id.toString(),
+    guestCount: session.guestCount,
+    openedAt: session.openedAt,
+    notes: session.notes
+  };
+}
 export function serializeShift(shift: Identified<Shift>) {
   return {
     id: shift._id.toString(),
