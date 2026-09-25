@@ -32,6 +32,7 @@ the applications:
 npm run seed
 npm run dev
 Invoke-RestMethod http://localhost:4000/health
+Invoke-RestMethod http://localhost:4000/ready
 ~~~
 
 For the Docker stack, use:
@@ -39,6 +40,7 @@ For the Docker stack, use:
 ~~~powershell
 docker compose up --build
 Invoke-RestMethod http://localhost:4000/health
+Invoke-RestMethod http://localhost:4000/ready
 Invoke-WebRequest http://localhost:8080/ -UseBasicParsing
 docker compose ps
 docker compose logs api --tail=100
@@ -77,3 +79,9 @@ Add a browser runner such as Playwright for these flows:
 When browser tests are introduced, include role-boundary, keyboard/focus,
 reduced-motion, contrast, and live-update checks alongside an automated
 accessibility scan.
+
+
+## Health endpoint semantics
+
+- `GET /health` is a public liveness probe. It reports only that the API process is serving requests and intentionally does not expose dependency state.
+- `GET /ready` is a readiness probe. It returns HTTP 200 when required database connectivity is available and HTTP 503 otherwise, without returning the raw database connection state.
