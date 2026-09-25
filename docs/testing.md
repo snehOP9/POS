@@ -77,3 +77,20 @@ Add a browser runner such as Playwright for these flows:
 When browser tests are introduced, include role-boundary, keyboard/focus,
 reduced-motion, contrast, and live-update checks alongside an automated
 accessibility scan.
+
+## Verified role-panel smoke pass
+
+Use a browser at `http://localhost:5173` so it matches the local `CLIENT_URL`
+CORS setting. Against a seeded disposable database, verify:
+
+1. Waiter: sign in, select an available table, set guest count and a seating
+   note, refresh, confirm both persisted, then close the empty session.
+2. Cashier: sign in, open Reports, Tables, Orders, Payments, and Shift; verify
+   each panel loads without a console or API error. Do not close a pre-existing
+   shift during verification.
+3. Kitchen: sign in, switch a station filter, and toggle kitchen alerts.
+4. Customer: verify no-QR menu ordering disables dine-in selection and a valid
+   table QR context enables it.
+
+The local `127.0.0.1` origin is not an equivalent smoke target unless it is
+explicitly added to the development API CORS allowlist.
