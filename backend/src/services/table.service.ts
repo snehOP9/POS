@@ -43,6 +43,7 @@ export async function openTableSession(actor: ActorContext, tableId: string, gue
   const table = await DiningTableModel.findOne({ _id: tableId, restaurantId: actor.restaurantId });
   if (!table) throw notFound("TABLE_NOT_FOUND", "Dining table was not found");
   if (table.status === "DISABLED") throw conflict("TABLE_UNAVAILABLE", "This table is disabled");
+  if (guestCount > table.capacity) throw conflict("TABLE_CAPACITY_EXCEEDED", `This table seats up to ${table.capacity} guests`);
   if (actor.role === "WAITER" && table.assignedWaiterId && table.assignedWaiterId.toString() !== actor.accountId) {
     throw forbidden("TABLE_NOT_ASSIGNED", "This table is not assigned to you");
   }
@@ -78,6 +79,7 @@ export async function updateTableSession(actor: ActorContext, tableId: string, g
   const table = await DiningTableModel.findOne({ _id: tableId, restaurantId: actor.restaurantId });
   if (!table) throw notFound("TABLE_NOT_FOUND", "Dining table was not found");
   if (table.status === "DISABLED") throw conflict("TABLE_UNAVAILABLE", "This table is disabled");
+  if (guestCount > table.capacity) throw conflict("TABLE_CAPACITY_EXCEEDED", `This table seats up to ${table.capacity} guests`);
   if (actor.role === "WAITER" && table.assignedWaiterId && table.assignedWaiterId.toString() !== actor.accountId) throw forbidden("TABLE_NOT_ASSIGNED", "This table is not assigned to you");
   const session = await TableSessionModel.findOne({ restaurantId: actor.restaurantId, tableId: table._id, status: "OPEN" });
   if (!session) throw conflict("TABLE_SESSION_NOT_OPEN", "This table does not have an active session");

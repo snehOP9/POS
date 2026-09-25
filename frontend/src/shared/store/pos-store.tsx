@@ -122,7 +122,7 @@ interface PosStore {
   openTableSession: (tableId: string, guestCount: number, note?: string) => void;
   updateTableSession: (tableId: string, guestCount: number, note?: string) => void;
   closeTableSession: (tableId: string) => void;
-  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number) => void;
+  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number, tableToken?: string) => void;
   startTicket: (ticketId: string) => void;
   markTicketItemReady: (ticketId: string, itemId: string) => void;
   markTicketReady: (ticketId: string) => void;
@@ -172,7 +172,6 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
         if (isCurrentAttempt()) {
           setAccessToken();
           setSession(undefined);
-          setDemoMode(true);
         }
       } finally {
         if (isCurrentAttempt()) setAuthLoading(false);
@@ -386,7 +385,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }).finally(() => setIsMutating(false));
   }, [demoMode, isMutating, notify, refreshOperations, tables]);
 
-  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number) => {
+  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number, tableToken?: string) => {
     if (!cart.length) {
       notify("Add something delicious before placing an order.", "danger");
       return;
@@ -458,6 +457,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       mode: cartMode,
       tableId: cartMode === "DINE_IN" && table ? selectedTableId : undefined,
       guestCount: cartMode === "DINE_IN" ? guestCount : undefined,
+      tableToken: cartMode === "DINE_IN" && source === "customer" ? tableToken : undefined,
       guestName: cartMode === "PICKUP" ? pickup?.name || "Guest" : undefined,
       guestPhone: cartMode === "PICKUP" ? pickup?.phone : undefined,
       items: cart.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity, variantId: line.variant?.id, modifierOptionIds: line.modifiers?.map((modifier) => modifier.id) ?? [], note: line.note })),

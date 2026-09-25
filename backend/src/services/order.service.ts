@@ -120,11 +120,15 @@ async function resolveTableContext(actor: ActorContext, input: CreateOrderInput)
   }
 
   if (!session) {
+    const guestCount = input.guestCount ?? 1;
+    if (guestCount > table.capacity) {
+      throw conflict("TABLE_CAPACITY_EXCEEDED", `This table seats up to ${table.capacity} guests`);
+    }
     session = await TableSessionModel.create({
       restaurantId: toObjectId(actor.restaurantId),
       tableId: table._id,
       openedByAccountId: toObjectId(actor.accountId),
-      guestCount: input.guestCount ?? 1,
+      guestCount,
       status: "OPEN"
     });
     table.status = "OCCUPIED";
