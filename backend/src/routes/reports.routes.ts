@@ -18,6 +18,8 @@ reportsRouter.get("/summary", requireAuth, requireRole("CASHIER"), validateReque
     totalSales: report.totalSalesPaise / 100,
     paid: report.paidPaise / 100,
     refunded: report.refundedPaise / 100,
-    averageOrder: report.averageOrderPaise / 100
+    averageOrder: report.averageOrderPaise / 100,
+    byMode: Object.fromEntries(Object.entries(report.byMode).map(([mode, amount]) => [mode, amount / 100])),
+    byProvider: Object.fromEntries(Object.entries(report.byProvider).map(([provider, amount]) => [provider, amount / 100]))
   });
 }));

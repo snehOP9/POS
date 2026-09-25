@@ -197,6 +197,9 @@ export const api = {
     createOrder: (payload: JsonRecord) =>
       apiRequest<unknown>("/cashier/orders", { method: "POST", body: JSON.stringify(payload) }),
   },
+  reports: {
+    summary: (from: string, to: string) => apiRequest<unknown>(`/reports/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  },
   payments: {
     cash: (payload: JsonRecord) =>
       apiRequest<unknown>("/payments/cash", { method: "POST", body: JSON.stringify(payload) }),
