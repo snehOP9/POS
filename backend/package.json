@@ -11,7 +11,7 @@
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "tsx --test src/domain/orderTransitions.test.ts src/domain/tableCapacity.test.ts src/lib/serializers.test.ts src/services/report.service.test.ts src/services/table.service.test.ts"
+    "test": "tsx --test src/domain/orderTransitions.test.ts src/domain/tableCapacity.test.ts src/lib/serializers.test.ts src/services/report.service.test.ts src/services/table.service.test.ts src/services/shift.service.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
