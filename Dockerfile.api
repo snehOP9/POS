@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-# Build from the workspace root so npm can resolve internal workspaces.
 FROM node:22-alpine AS build
 WORKDIR /app
 
@@ -15,9 +13,6 @@ COPY packages/shared ./packages/shared
 RUN npm run build --workspace=@emberserve/shared \
   && npm run build --workspace=@emberserve/api
 RUN npm prune --omit=dev
-
-# Keep runtime privileges minimal. The compiled API imports the shared
-# workspace, so retain its package metadata and build output too.
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production

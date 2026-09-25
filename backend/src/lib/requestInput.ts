@@ -1,8 +1,6 @@
 import type { Request } from "express";
 
 import { badRequest } from "./errors.js";
-
-/** Values are normalized by validateRequest before route handlers call these helpers. */
 export function validatedQuery<T>(request: Request): T {
   return request.query as unknown as T;
 }

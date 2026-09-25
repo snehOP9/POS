@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-# Build from the workspace root so npm can resolve internal workspaces.
 FROM node:22-alpine AS build
 WORKDIR /app
 

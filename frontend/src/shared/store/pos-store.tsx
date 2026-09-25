@@ -187,7 +187,6 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       localStorage.setItem(cartStorageKey, JSON.stringify(cart));
       localStorage.removeItem(legacyCartStorageKey);
     } catch {
-      // Cart persistence is progressive enhancement; order creation still uses in-memory state.
     }
   }, [cart]);
 
