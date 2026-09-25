@@ -73,6 +73,23 @@ export async function openTableSession(actor: ActorContext, tableId: string, gue
   return { table, session };
 }
 
+export async function updateTableSession(actor: ActorContext, tableId: string, guestCount: number, note?: string) {
+  assertTableRole(actor);
+  const table = await DiningTableModel.findOne({ _id: tableId, restaurantId: actor.restaurantId });
+  if (!table) throw notFound("TABLE_NOT_FOUND", "Dining table was not found");
+  if (table.status === "DISABLED") throw conflict("TABLE_UNAVAILABLE", "This table is disabled");
+  if (actor.role === "WAITER" && table.assignedWaiterId && table.assignedWaiterId.toString() !== actor.accountId) throw forbidden("TABLE_NOT_ASSIGNED", "This table is not assigned to you");
+  const session = await TableSessionModel.findOne({ restaurantId: actor.restaurantId, tableId: table._id, status: "OPEN" });
+  if (!session) throw conflict("TABLE_SESSION_NOT_OPEN", "This table does not have an active session");
+  session.guestCount = guestCount;
+  if (note !== undefined) session.notes = note;
+  await session.save();
+  await recordAudit({ restaurantId: actor.restaurantId, actorId: actor.accountId, actorRole: actor.role, action: "TABLE_SESSION_UPDATED", entityType: "TableSession", entityId: session._id.toString(), after: { tableId, guestCount, note } });
+  emitToRole(actor.restaurantId, "WAITER", "table:updated", serializeTable(table));
+  emitToRole(actor.restaurantId, "CASHIER", "table:updated", serializeTable(table));
+  return { table, session };
+}
+
 export async function closeTableSession(actor: ActorContext, tableId: string) {
   assertTableRole(actor);
   const table = await DiningTableModel.findOne({ _id: tableId, restaurantId: actor.restaurantId });

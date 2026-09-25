@@ -119,6 +119,9 @@ interface PosStore {
   setCartOpen: (open: boolean) => void;
   selectTable: (tableId: string) => void;
   adjustGuests: (tableId: string, adjustment: number) => void;
+  openTableSession: (tableId: string, guestCount: number, note?: string) => void;
+  updateTableSession: (tableId: string, guestCount: number, note?: string) => void;
+  closeTableSession: (tableId: string) => void;
   placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => void;
   startTicket: (ticketId: string) => void;
   markTicketItemReady: (ticketId: string, itemId: string) => void;
@@ -308,16 +311,80 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const selectTable = useCallback((tableId: string) => setSelectedTableId(tableId), []);
 
   const adjustGuests = useCallback((tableId: string, adjustment: number) => {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    const guestCount = Math.min(table.seats, Math.max(0, table.guests + adjustment));
     if (!demoMode) {
-      notify("Guest counts are server-controlled. Open Preview mode to simulate a table.", "info");
+      if (!table.sessionId || guestCount < 1) {
+        notify("Open the table session before changing its guest count.", "info");
+        return;
+      }
+      if (isMutating) return;
+      setIsMutating(true);
+      void api.waiter.updateTableSession(tableId, { guestCount }).then(() => refreshOperations()).catch((error: unknown) => {
+        notify(error instanceof ApiError ? error.message : "Guest count could not be updated.", "danger");
+      }).finally(() => setIsMutating(false));
       return;
     }
-    setTables((current) => current.map((table) => {
-      if (table.id !== tableId) return table;
-      const guests = Math.min(table.seats, Math.max(0, table.guests + adjustment));
-      return { ...table, guests, status: guests ? (table.status === "available" ? "seated" : table.status) : "available" };
-    }));
-  }, [demoMode, notify]);
+    setTables((current) => current.map((candidate) => candidate.id === tableId ? {
+      ...candidate,
+      guests: guestCount,
+      status: guestCount ? (candidate.status === "available" ? "seated" : candidate.status) : "available",
+    } : candidate));
+  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+
+  const openTableSession = useCallback((tableId: string, guestCount: number, note?: string) => {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    if (guestCount < 1 || guestCount > table.seats) {
+      notify(`Enter between 1 and ${table.seats} guests for ${table.label}.`, "danger");
+      return;
+    }
+    if (demoMode) {
+      setTables((current) => current.map((candidate) => candidate.id === tableId ? { ...candidate, guests: guestCount, status: "seated", sessionNote: note } : candidate));
+      notify(`${table.label} opened for ${guestCount} guest${guestCount === 1 ? "" : "s"}.`, "success");
+      return;
+    }
+    if (isMutating) return;
+    setIsMutating(true);
+    void api.waiter.openTable(tableId, { guestCount, note }).then(() => refreshOperations()).then(() => notify(`${table.label} opened for ${guestCount} guest${guestCount === 1 ? "" : "s"}.`, "success")).catch((error: unknown) => {
+      notify(error instanceof ApiError ? error.message : "The table could not be opened.", "danger");
+    }).finally(() => setIsMutating(false));
+  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+
+  const updateTableSession = useCallback((tableId: string, guestCount: number, note?: string) => {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    if (guestCount < 1 || guestCount > table.seats) {
+      notify(`Enter between 1 and ${table.seats} guests for ${table.label}.`, "danger");
+      return;
+    }
+    if (demoMode) {
+      setTables((current) => current.map((candidate) => candidate.id === tableId ? { ...candidate, guests: guestCount, sessionNote: note ?? candidate.sessionNote } : candidate));
+      notify(`${table.label} guest count updated.`, "info");
+      return;
+    }
+    if (!table.sessionId || isMutating) return;
+    setIsMutating(true);
+    void api.waiter.updateTableSession(tableId, { guestCount, note }).then(() => refreshOperations()).then(() => notify(`${table.label} guest count updated.`, "info")).catch((error: unknown) => {
+      notify(error instanceof ApiError ? error.message : "The table session could not be updated.", "danger");
+    }).finally(() => setIsMutating(false));
+  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+
+  const closeTableSession = useCallback((tableId: string) => {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    if (demoMode) {
+      setTables((current) => current.map((candidate) => candidate.id === tableId ? { ...candidate, guests: 0, status: "available", elapsedMinutes: 0, total: 0, orderId: undefined, sessionId: undefined, sessionOpenedAt: undefined, sessionNote: undefined } : candidate));
+      notify(`${table.label} is available again.`, "success");
+      return;
+    }
+    if (isMutating) return;
+    setIsMutating(true);
+    void api.tables.closeSession(tableId).then(() => refreshOperations()).then(() => notify(`${table.label} session closed.`, "success")).catch((error: unknown) => {
+      notify(error instanceof ApiError ? error.message : "The table session could not be closed.", "danger");
+    }).finally(() => setIsMutating(false));
+  }, [demoMode, isMutating, notify, refreshOperations, tables]);
 
   const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => {
     if (!cart.length) {
@@ -615,12 +682,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const value = useMemo<PosStore>(() => ({
     menu, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
     selectedTableId, toasts, session, authLoading, demoMode, isMutating, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
-    selectTable, adjustGuests, placeOrder, startTicket, markTicketItemReady, markTicketReady, bumpTicket, serveOrder,
+    selectTable, adjustGuests, openTableSession, updateTableSession, closeTableSession, placeOrder, startTicket, markTicketItemReady, markTicketReady, bumpTicket, serveOrder,
     requestBill, settleOrder, notify, login, logout,
   }), [
     addToCart, adjustGuests, bumpTicket, cart, cartMode, cartOpen, cartService, cartSubtotal, cartTax,
     authLoading, cartTotal, clearCart, demoMode, isMutating, login, logout, markTicketItemReady, menu, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill,
-    selectedTableId, serveOrder, session, settleOrder, startTicket, markTicketReady, tables, tickets, toasts, updateLineQuantity,
+    closeTableSession, openTableSession, selectedTableId, serveOrder, session, settleOrder, startTicket, markTicketReady, tables, tickets, toasts, updateLineQuantity, updateTableSession,
   ]);
 
   return <PosContext.Provider value={value}>{children}</PosContext.Provider>;
