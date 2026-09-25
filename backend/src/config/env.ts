@@ -45,6 +45,8 @@ if (!parsedEnvironment.success) {
 export const env = {
   ...parsedEnvironment.data,
   clientUrls: parsedEnvironment.data.CLIENT_URL.split(",").map((url) => url.trim()).filter(Boolean),
-  cookieSecure: parsedEnvironment.data.COOKIE_SECURE ?? parsedEnvironment.data.NODE_ENV === "production",
+  cookieSecure:
+    parsedEnvironment.data.NODE_ENV === "production" ||
+    (parsedEnvironment.data.COOKIE_SECURE ?? false),
   cookieDomain: parsedEnvironment.data.COOKIE_DOMAIN === "localhost" ? undefined : parsedEnvironment.data.COOKIE_DOMAIN
 } as const;
