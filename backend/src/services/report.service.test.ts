@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { serializeReportSummary } from "./report.service.js";
+import { AppError } from "../lib/errors.js";
+import { reportSummary, serializeReportSummary } from "./report.service.js";
 
 test("report serialization converts all cashier money values from paise", () => {
   const response = serializeReportSummary({
@@ -23,4 +24,17 @@ test("report serialization converts all cashier money values from paise", () => 
   assert.deepEqual(response.byMode, { DINE_IN: 2500, PICKUP: 1185 });
   assert.deepEqual(response.byProvider, { CASH: 1100, RAZORPAY: 2000 });
   assert.equal(response.totalSalesPaise, 368500);
+});
+
+test("report service rejects a non-cashier before reading report data", async () => {
+  await assert.rejects(
+    reportSummary({
+      accountId: "staff-account",
+      restaurantId: "restaurant",
+      role: "WAITER",
+      permissions: [],
+      tokenVersion: 0
+    }, new Date("2026-09-01T00:00:00.000Z"), new Date("2026-09-01T23:59:59.999Z")),
+    (error: unknown) => error instanceof AppError && error.code === "AUTH_MISSING_PERMISSION"
+  );
 });
