@@ -4,7 +4,7 @@ import { ShiftModel } from "../models/Shift.js";
 import { recordAudit } from "./audit.service.js";
 import type { ActorContext } from "./order.service.js";
 
-function assertShiftPermission(actor: ActorContext, permission: "canOpenShift" | "canCloseShift"): void {
+export function assertShiftPermission(actor: ActorContext, permission: "canOpenShift" | "canCloseShift"): void {
   if (actor.role !== "CASHIER" || !actor.permissions.includes(permission)) {
     throw forbidden("AUTH_MISSING_PERMISSION", "Your account lacks the required shift permission");
   }
