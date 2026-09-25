@@ -6,7 +6,7 @@ import { logger } from "../config/logger.js";
 import { AppError } from "../lib/errors.js";
 
 export const notFoundHandler: RequestHandler = (request, _response, next) => {
-  next(new AppError(404, "ROUTE_NOT_FOUND", `No route matches ${request.method} ${request.originalUrl}`));
+  next(new AppError(404, "ROUTE_NOT_FOUND", `No route matches ${request.method} ${request.path}`));
 };
 
 function duplicateKeyError(error: unknown): error is { code: number; keyValue?: Record<string, unknown> } {
@@ -34,7 +34,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
   } else if (error instanceof mongoose.Error.VersionError) {
     normalized = new AppError(409, "ORDER_VERSION_CONFLICT", "This record changed; refresh and try again");
   } else if (duplicateKeyError(error)) {
-    normalized = new AppError(409, "DUPLICATE_RESOURCE", "A record with that value already exists", error.keyValue);
+    normalized = new AppError(409, "DUPLICATE_RESOURCE", "A record with that value already exists");
   } else {
     normalized = new AppError(500, "INTERNAL_ERROR", "An unexpected error occurred");
   }
