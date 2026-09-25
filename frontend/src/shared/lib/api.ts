@@ -200,6 +200,11 @@ export const api = {
   reports: {
     summary: (from: string, to: string) => apiRequest<unknown>(`/reports/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   },
+  shifts: {
+    current: () => apiRequest<unknown>("/shifts/current"),
+    open: (payload: JsonRecord) => apiRequest<unknown>("/shifts/open", { method: "POST", body: JSON.stringify(payload) }),
+    close: (payload: JsonRecord) => apiRequest<unknown>("/shifts/close", { method: "POST", body: JSON.stringify(payload) }),
+  },
   payments: {
     cash: (payload: JsonRecord) =>
       apiRequest<unknown>("/payments/cash", { method: "POST", body: JSON.stringify(payload) }),
