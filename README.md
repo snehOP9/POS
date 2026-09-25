@@ -166,6 +166,7 @@ relevant panel flow. See the testing guide for the full smoke-test matrix.
 - [Operations runbook](docs/operations.md)
 - [Backup and restore](docs/backup-restore.md)
 - [Development credentials](docs/sample-credentials.md)
+- [240-item feature roadmap](docs/feature-roadmap.md)
 
 ## Production note
 
