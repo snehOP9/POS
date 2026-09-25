@@ -11,3 +11,8 @@ test("table capacity accepts a party that fits", () => {
 test("table capacity rejects an oversized party", () => {
   assert.throws(() => assertTableCapacity(5, 4), (error: unknown) => error instanceof AppError && error.code === "TABLE_CAPACITY_EXCEEDED");
 });
+test("table capacity rejects invalid guest counts", () => {
+  for (const guestCount of [0, -1, 1.5]) {
+    assert.throws(() => assertTableCapacity(guestCount, 4), (error: unknown) => error instanceof AppError && error.code === "TABLE_GUEST_COUNT_INVALID");
+  }
+});
