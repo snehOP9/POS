@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 
 import { assertTableCapacity } from "../domain/tableCapacity.js";
 import { conflict, forbidden, notFound } from "../lib/errors.js";
-import { serializeTable } from "../lib/serializers.js";
+import { serializeTable, serializeTableSession } from "../lib/serializers.js";
 import { DiningTableModel } from "../models/DiningTable.js";
 import { OrderModel } from "../models/Order.js";
 import { TableSessionModel } from "../models/TableSession.js";
@@ -14,6 +14,11 @@ function assertTableRole(actor: ActorContext): void {
   if (actor.role !== "WAITER" && actor.role !== "CASHIER") throw forbidden();
 }
 
+export function assertTableAssignment(actor: ActorContext, assignedWaiterId?: { toString(): string }): void {
+  if (actor.role === "WAITER" && assignedWaiterId && assignedWaiterId.toString() !== actor.accountId) {
+    throw forbidden("TABLE_NOT_ASSIGNED", "This table is not assigned to you");
+  }
+}
 export async function listTables(actor: ActorContext, assignedOnly = false) {
   assertTableRole(actor);
   const filter = {
@@ -29,13 +34,7 @@ export async function listTables(actor: ActorContext, assignedOnly = false) {
   const sessionsByTable = new Map(sessions.map((session) => [session.tableId.toString(), session]));
   return tables.map((table) => ({
     ...serializeTable(table),
-    session: sessionsByTable.get(table._id.toString())
-      ? {
-          id: sessionsByTable.get(table._id.toString())?._id.toString(),
-          guestCount: sessionsByTable.get(table._id.toString())?.guestCount,
-          openedAt: sessionsByTable.get(table._id.toString())?.openedAt
-        }
-      : undefined
+    session: sessionsByTable.get(table._id.toString()) ? serializeTableSession(sessionsByTable.get(table._id.toString())!) : undefined
   }));
 }
 
@@ -45,9 +44,7 @@ export async function openTableSession(actor: ActorContext, tableId: string, gue
   if (!table) throw notFound("TABLE_NOT_FOUND", "Dining table was not found");
   if (table.status === "DISABLED") throw conflict("TABLE_UNAVAILABLE", "This table is disabled");
   assertTableCapacity(guestCount, table.capacity);
-  if (actor.role === "WAITER" && table.assignedWaiterId && table.assignedWaiterId.toString() !== actor.accountId) {
-    throw forbidden("TABLE_NOT_ASSIGNED", "This table is not assigned to you");
-  }
+  assertTableAssignment(actor, table.assignedWaiterId);
   const active = await TableSessionModel.findOne({ restaurantId: actor.restaurantId, tableId: table._id, status: "OPEN" });
   if (active) throw conflict("TABLE_ALREADY_ACTIVE", "This table already has an active session");
 
@@ -81,7 +78,7 @@ export async function updateTableSession(actor: ActorContext, tableId: string, g
   if (!table) throw notFound("TABLE_NOT_FOUND", "Dining table was not found");
   if (table.status === "DISABLED") throw conflict("TABLE_UNAVAILABLE", "This table is disabled");
   assertTableCapacity(guestCount, table.capacity);
-  if (actor.role === "WAITER" && table.assignedWaiterId && table.assignedWaiterId.toString() !== actor.accountId) throw forbidden("TABLE_NOT_ASSIGNED", "This table is not assigned to you");
+  assertTableAssignment(actor, table.assignedWaiterId);
   const session = await TableSessionModel.findOne({ restaurantId: actor.restaurantId, tableId: table._id, status: "OPEN" });
   if (!session) throw conflict("TABLE_SESSION_NOT_OPEN", "This table does not have an active session");
   session.guestCount = guestCount;
@@ -97,6 +94,7 @@ export async function closeTableSession(actor: ActorContext, tableId: string) {
   assertTableRole(actor);
   const table = await DiningTableModel.findOne({ _id: tableId, restaurantId: actor.restaurantId });
   if (!table) throw notFound("TABLE_NOT_FOUND", "Dining table was not found");
+  assertTableAssignment(actor, table.assignedWaiterId);
   const session = await TableSessionModel.findOne({ restaurantId: actor.restaurantId, tableId: table._id, status: "OPEN" });
   if (!session) throw conflict("TABLE_SESSION_NOT_OPEN", "This table does not have an active session");
   const unsettled = await OrderModel.exists({
