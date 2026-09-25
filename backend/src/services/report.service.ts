@@ -3,7 +3,36 @@ import { OrderModel } from "../models/Order.js";
 import { PaymentModel } from "../models/Payment.js";
 import type { ActorContext } from "./order.service.js";
 
-export async function reportSummary(actor: ActorContext, from: Date, to: Date) {
+export interface ReportSummary {
+  from: Date;
+  to: Date;
+  orderCount: number;
+  totalSalesPaise: number;
+  paidPaise: number;
+  refundedPaise: number;
+  averageOrderPaise: number;
+  byMode: Record<string, number>;
+  byProvider: Record<string, number>;
+}
+
+export function serializeReportSummary(report: ReportSummary) {
+  const currency = (amountPaise: number) => amountPaise / 100;
+  const moneyByKey = (amounts: Record<string, number>) => Object.fromEntries(
+    Object.entries(amounts).map(([key, amount]) => [key, currency(amount)])
+  );
+
+  return {
+    ...report,
+    totalSales: currency(report.totalSalesPaise),
+    paid: currency(report.paidPaise),
+    refunded: currency(report.refundedPaise),
+    averageOrder: currency(report.averageOrderPaise),
+    byMode: moneyByKey(report.byMode),
+    byProvider: moneyByKey(report.byProvider)
+  };
+}
+
+export async function reportSummary(actor: ActorContext, from: Date, to: Date): Promise<ReportSummary> {
   if (actor.role !== "CASHIER" || !actor.permissions.includes("canViewReports")) {
     throw forbidden("AUTH_MISSING_PERMISSION", "Viewing reports requires permission");
   }
