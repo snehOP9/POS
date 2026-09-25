@@ -13,7 +13,7 @@ import { formatMoney } from "@/shared/lib/format";
 import { usePos } from "@/shared/store/pos-store";
 import { selectionForOption, unitPriceForSelection } from "@/shared/lib/cart";
 import type { MenuItem } from "@/shared/types/domain";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const heat = (level = 0) => "●".repeat(level);
 
@@ -72,6 +72,12 @@ const DishDialog = ({ item, onClose }: { item: MenuItem; onClose: () => void }) 
 export const MenuPage = () => {
   const { cart, setCartOpen, placeOrder, cartMode, setCartMode, orders, menu: items, menuLoading, menuError, refreshMenu, refreshOperations, demoMode, session, notify } = usePos();
   const navigate = useNavigate();
+  const location = useLocation();
+  const tableToken = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    return query.get("tableToken") || query.get("table") || query.get("token") || undefined;
+  }, [location.search]);
+  const dineInAvailable = demoMode || Boolean(tableToken);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [vegetarian, setVegetarian] = useState(false);
@@ -81,8 +87,8 @@ export const MenuPage = () => {
   const live = useLiveUpdates(refreshOperations);
 
   useEffect(() => {
-    if (!demoMode && cartMode === "DINE_IN") setCartMode("PICKUP");
-  }, [cartMode, demoMode, setCartMode]);
+    if (!dineInAvailable && cartMode === "DINE_IN") setCartMode("PICKUP");
+  }, [cartMode, dineInAvailable, setCartMode]);
 
   const displayItems = items.length ? items : menuError ? previewMenuItems : items;
   const usingPreviewFallback = !items.length && Boolean(menuError);
@@ -111,10 +117,10 @@ export const MenuPage = () => {
 
     <section className="menu-section" id="menu-list"><div className="section-heading"><div><span className="eyebrow">The everyday menu</span><h2>Choose your own delicious</h2></div><span className="menu-source">{demoMode ? "Preview menu" : usingPreviewFallback ? "Preview menu · API offline" : menuLoading ? "Loading live menu" : "Live menu"}</span></div><div className="menu-toolbar"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a dish or ingredient" aria-label="Search menu" /><kbd>⌘ K</kbd></label><label className="veg-switch"><input type="checkbox" checked={vegetarian} onChange={(event) => setVegetarian(event.target.checked)} /><span className="dietary-dot dietary-dot--veg" /> Vegetarian</label></div><div className="category-rail" aria-label="Menu categories">{activeCategories.map((category) => <button type="button" key={category} className={activeCategory === category ? "category-chip category-chip--active" : "category-chip"} onClick={() => setActiveCategory(category)}>{category}</button>)}</div><div className="menu-grid">{visibleItems.map((item) => <MenuCard key={item.id} item={item} onCustomize={setSelectedDish} />)}</div>{usingPreviewFallback && <div className="empty-state menu-empty"><UtensilsCrossed size={34} /><strong>Showing the complete preview menu while the live API is offline.</strong><span>The Vercel frontend is healthy; connect a production API to enable live restaurant data and ordering.</span><button type="button" className="quiet-button" onClick={refreshMenu}>Retry live menu</button></div>}{!visibleItems.length && <div className="empty-state menu-empty"><UtensilsCrossed size={34} /><strong>{menuLoading ? "The kitchen is loading today’s menu." : menuError ?? "No plates match that search."}</strong><span>{menuError ? "Check the connection or try again in a moment." : "Try another ingredient or clear a filter."}</span><button type="button" className="quiet-button" onClick={() => { if (menuError) refreshMenu(); setSearch(""); setActiveCategory("All"); setVegetarian(false); }}>{menuError ? "Retry menu" : "Reset menu"}</button></div>}</section>
 
-    <section className="dining-note"><div className="dining-note__star"><Heart fill="currentColor" size={23} /></div><div><span className="eyebrow">A note from our kitchen</span><h2>We cook each order to the moment it’s called.</h2><p>Please let us know about allergies — the team will see your note before the fire starts.</p></div><div className="dining-mode"><span>How are you dining?</span><div>{(["DINE_IN", "PICKUP"] as const).map((mode) => <button key={mode} type="button" className={cartMode === mode ? "mode-pill mode-pill--active" : "mode-pill"} onClick={() => setCartMode(mode)}>{mode === "DINE_IN" ? "At my table" : "I’ll pick up"}</button>)}</div></div></section>
+    <section className="dining-note"><div className="dining-note__star"><Heart fill="currentColor" size={23} /></div><div><span className="eyebrow">A note from our kitchen</span><h2>We cook each order to the moment it’s called.</h2><p>Please let us know about allergies — the team will see your note before the fire starts.</p></div><div className="dining-mode"><span>How are you dining?</span><div>{(["DINE_IN", "PICKUP"] as const).map((mode) => <button key={mode} type="button" className={cartMode === mode ? "mode-pill mode-pill--active" : "mode-pill"} disabled={mode === "DINE_IN" && !dineInAvailable} onClick={() => setCartMode(mode)}>{mode === "DINE_IN" ? "At my table" : "I’ll pick up"}</button>)}</div>{!dineInAvailable && <small>Scan your table QR code to order at your table.</small>}</div></section>
 
     {count > 0 && <button className="mobile-cart-bar" type="button" onClick={() => setCartOpen(true)}><ShoppingBag size={19} /><span>{count} {count === 1 ? "item" : "items"}</span><strong>View tray</strong></button>}
-    <CartDrawer checkoutLabel={cartMode === "DINE_IN" ? "Send to kitchen" : "Place pickup order"} pickupDetails={{ name: pickupName, phone: pickupPhone, onNameChange: setPickupName, onPhoneChange: setPickupPhone }} onCheckout={() => { if (!session || session.role !== "CUSTOMER") { navigate("/login", { state: { from: "/menu" } }); return; } placeOrder("customer", "UNPAID", undefined, { name: pickupName.trim(), phone: pickupPhone.trim() }); }} />
+    <CartDrawer checkoutLabel={cartMode === "DINE_IN" ? "Send to kitchen" : "Place pickup order"} pickupDetails={{ name: pickupName, phone: pickupPhone, onNameChange: setPickupName, onPhoneChange: setPickupPhone }} onCheckout={() => { if (!session || session.role !== "CUSTOMER") { navigate("/login", { state: { from: "/menu" } }); return; } placeOrder("customer", "UNPAID", undefined, { name: pickupName.trim(), phone: pickupPhone.trim() }, undefined, tableToken); }} />
     {selectedDish && <DishDialog item={selectedDish} onClose={() => setSelectedDish(undefined)} />}
   </main>;
 };
