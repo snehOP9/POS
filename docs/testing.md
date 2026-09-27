@@ -32,6 +32,7 @@ the applications:
 npm run seed
 npm run dev
 Invoke-RestMethod http://localhost:4000/health
+Invoke-RestMethod http://localhost:4000/ready
 ~~~
 
 For the Docker stack, use:
@@ -39,6 +40,7 @@ For the Docker stack, use:
 ~~~powershell
 docker compose up --build
 Invoke-RestMethod http://localhost:4000/health
+Invoke-RestMethod http://localhost:4000/ready
 Invoke-WebRequest http://localhost:8080/ -UseBasicParsing
 docker compose ps
 docker compose logs api --tail=100
@@ -94,3 +96,8 @@ CORS setting. Against a seeded disposable database, verify:
 
 The local `127.0.0.1` origin is not an equivalent smoke target unless it is
 explicitly added to the development API CORS allowlist.
+
+## Health endpoint semantics
+
+- `GET /health` is a public liveness probe. It reports only that the API process is serving requests and intentionally does not expose dependency state.
+- `GET /ready` is a readiness probe. It returns HTTP 200 when required database connectivity is available and HTTP 503 otherwise, without returning the raw database connection state.
