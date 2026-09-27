@@ -119,9 +119,13 @@ interface PosStore {
   setCartOpen: (open: boolean) => void;
   selectTable: (tableId: string) => void;
   adjustGuests: (tableId: string, adjustment: number) => void;
-  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => void;
+  openTableSession: (tableId: string, guestCount: number, note?: string) => void;
+  updateTableSession: (tableId: string, guestCount: number, note?: string) => void;
+  closeTableSession: (tableId: string) => void;
+  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number, tableToken?: string) => void;
   startTicket: (ticketId: string) => void;
   markTicketItemReady: (ticketId: string, itemId: string) => void;
+  markTicketReady: (ticketId: string) => void;
   bumpTicket: (ticketId: string) => void;
   serveOrder: (orderId: string) => void;
   requestBill: (tableId: string) => void;
@@ -168,7 +172,6 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
         if (isCurrentAttempt()) {
           setAccessToken();
           setSession(undefined);
-          setDemoMode(true);
         }
       } finally {
         if (isCurrentAttempt()) setAuthLoading(false);
@@ -186,7 +189,6 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       localStorage.setItem(cartStorageKey, JSON.stringify(cart));
       localStorage.removeItem(legacyCartStorageKey);
     } catch {
-      // Cart persistence is progressive enhancement; order creation still uses in-memory state.
     }
   }, [cart]);
 
@@ -308,18 +310,82 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const selectTable = useCallback((tableId: string) => setSelectedTableId(tableId), []);
 
   const adjustGuests = useCallback((tableId: string, adjustment: number) => {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    const guestCount = Math.min(table.seats, Math.max(0, table.guests + adjustment));
     if (!demoMode) {
-      notify("Guest counts are server-controlled. Open Preview mode to simulate a table.", "info");
+      if (!table.sessionId || guestCount < 1) {
+        notify("Open the table session before changing its guest count.", "info");
+        return;
+      }
+      if (isMutating) return;
+      setIsMutating(true);
+      void api.waiter.updateTableSession(tableId, { guestCount }).then(() => refreshOperations()).catch((error: unknown) => {
+        notify(error instanceof ApiError ? error.message : "Guest count could not be updated.", "danger");
+      }).finally(() => setIsMutating(false));
       return;
     }
-    setTables((current) => current.map((table) => {
-      if (table.id !== tableId) return table;
-      const guests = Math.min(table.seats, Math.max(0, table.guests + adjustment));
-      return { ...table, guests, status: guests ? (table.status === "available" ? "seated" : table.status) : "available" };
-    }));
-  }, [demoMode, notify]);
+    setTables((current) => current.map((candidate) => candidate.id === tableId ? {
+      ...candidate,
+      guests: guestCount,
+      status: guestCount ? (candidate.status === "available" ? "seated" : candidate.status) : "available",
+    } : candidate));
+  }, [demoMode, isMutating, notify, refreshOperations, tables]);
 
-  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }) => {
+  const openTableSession = useCallback((tableId: string, guestCount: number, note?: string) => {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    if (guestCount < 1 || guestCount > table.seats) {
+      notify(`Enter between 1 and ${table.seats} guests for ${table.label}.`, "danger");
+      return;
+    }
+    if (demoMode) {
+      setTables((current) => current.map((candidate) => candidate.id === tableId ? { ...candidate, guests: guestCount, status: "seated", sessionNote: note } : candidate));
+      notify(`${table.label} opened for ${guestCount} guest${guestCount === 1 ? "" : "s"}.`, "success");
+      return;
+    }
+    if (isMutating) return;
+    setIsMutating(true);
+    void api.waiter.openTable(tableId, { guestCount, note }).then(() => refreshOperations()).then(() => notify(`${table.label} opened for ${guestCount} guest${guestCount === 1 ? "" : "s"}.`, "success")).catch((error: unknown) => {
+      notify(error instanceof ApiError ? error.message : "The table could not be opened.", "danger");
+    }).finally(() => setIsMutating(false));
+  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+
+  const updateTableSession = useCallback((tableId: string, guestCount: number, note?: string) => {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    if (guestCount < 1 || guestCount > table.seats) {
+      notify(`Enter between 1 and ${table.seats} guests for ${table.label}.`, "danger");
+      return;
+    }
+    if (demoMode) {
+      setTables((current) => current.map((candidate) => candidate.id === tableId ? { ...candidate, guests: guestCount, sessionNote: note ?? candidate.sessionNote } : candidate));
+      notify(`${table.label} guest count updated.`, "info");
+      return;
+    }
+    if (!table.sessionId || isMutating) return;
+    setIsMutating(true);
+    void api.waiter.updateTableSession(tableId, { guestCount, note }).then(() => refreshOperations()).then(() => notify(`${table.label} guest count updated.`, "info")).catch((error: unknown) => {
+      notify(error instanceof ApiError ? error.message : "The table session could not be updated.", "danger");
+    }).finally(() => setIsMutating(false));
+  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+
+  const closeTableSession = useCallback((tableId: string) => {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    if (demoMode) {
+      setTables((current) => current.map((candidate) => candidate.id === tableId ? { ...candidate, guests: 0, status: "available", elapsedMinutes: 0, total: 0, orderId: undefined, sessionId: undefined, sessionOpenedAt: undefined, sessionNote: undefined } : candidate));
+      notify(`${table.label} is available again.`, "success");
+      return;
+    }
+    if (isMutating) return;
+    setIsMutating(true);
+    void api.tables.closeSession(tableId).then(() => refreshOperations()).then(() => notify(`${table.label} session closed.`, "success")).catch((error: unknown) => {
+      notify(error instanceof ApiError ? error.message : "The table session could not be closed.", "danger");
+    }).finally(() => setIsMutating(false));
+  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+
+  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number, tableToken?: string) => {
     if (!cart.length) {
       notify("Add something delicious before placing an order.", "danger");
       return;
@@ -376,7 +442,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (demoMode && cartMode === "DINE_IN" && table) {
         setTables((current) => current.map((candidate) => candidate.id === table.id ? {
           ...candidate,
-          guests: candidate.guests || Math.min(2, candidate.seats),
+          guests: candidate.guests || Math.min(guestCount ?? 2, candidate.seats),
           status: "seated",
           total: candidate.total + total,
           orderId: order.id,
@@ -390,6 +456,8 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     const requestPayload = {
       mode: cartMode,
       tableId: cartMode === "DINE_IN" && table ? selectedTableId : undefined,
+      guestCount: cartMode === "DINE_IN" ? guestCount : undefined,
+      tableToken: cartMode === "DINE_IN" && source === "customer" ? tableToken : undefined,
       guestName: cartMode === "PICKUP" ? pickup?.name || "Guest" : undefined,
       guestPhone: cartMode === "PICKUP" ? pickup?.phone : undefined,
       items: cart.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity, variantId: line.variant?.id, modifierOptionIds: line.modifiers?.map((modifier) => modifier.id) ?? [], note: line.note })),
@@ -485,6 +553,32 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }).finally(() => setIsMutating(false));
   }, [demoMode, isMutating, notify, refreshOperations, tickets]);
 
+  const markTicketReady = useCallback((ticketId: string) => {
+    const ticket = tickets.find((candidate) => candidate.id === ticketId);
+    if (!ticket) return;
+    const items = ticket.items.map((item) => ({ ...item, status: "READY" as const }));
+    const apply = () => {
+      setTickets((current) => current.map((candidate) => candidate.id === ticketId ? { ...candidate, status: "ready", items } : candidate));
+      setOrders((current) => current.map((order) => {
+        if (order.id !== ticket.orderId) return order;
+        const nextItems = order.items.map((item) => items.find((update) => update.id === item.id) ?? item);
+        return { ...order, items: nextItems, status: orderStatusFromItems(nextItems) };
+      }));
+      setTables((current) => current.map((table) => table.orderId === ticket.orderId ? { ...table, status: "ready" } : table));
+      notify(`${ticket.displayId} is ready to serve.`, "success");
+      if (!demoMode) refreshOperations();
+    };
+    if (demoMode) { apply(); return; }
+    if (isMutating) return;
+    setIsMutating(true);
+    void Promise.all(ticket.items.filter((item) => item.status !== "READY").map((item) => api.kitchen.updateItem(ticketId, item.id, "READY")))
+      .then(() => api.kitchen.updateTicket(ticketId, "READY"))
+      .then(apply)
+      .catch((error: unknown) => {
+        notify(error instanceof ApiError ? error.message : "Ticket could not be marked ready.", "danger");
+      }).finally(() => setIsMutating(false));
+  }, [demoMode, isMutating, notify, refreshOperations, tickets]);
+
   const bumpTicket = useCallback((ticketId: string) => {
     const ticket = tickets.find((candidate) => candidate.id === ticketId);
     if (!ticket) return;
@@ -564,6 +658,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     restoreAttempt.current += 1;
     setAuthLoading(false);
     setDemoMode(preview);
+    if (preview) {
+      setMenu(previewMenuItems);
+      setPricing(fallbackRestaurantPricing);
+      setMenuError(undefined);
+      setMenuLoading(false);
+    }
     setSession({ role, name, accessToken, preview });
   }, []);
   const logout = useCallback(() => {
@@ -583,12 +683,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const value = useMemo<PosStore>(() => ({
     menu, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
     selectedTableId, toasts, session, authLoading, demoMode, isMutating, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
-    selectTable, adjustGuests, placeOrder, startTicket, markTicketItemReady, bumpTicket, serveOrder,
+    selectTable, adjustGuests, openTableSession, updateTableSession, closeTableSession, placeOrder, startTicket, markTicketItemReady, markTicketReady, bumpTicket, serveOrder,
     requestBill, settleOrder, notify, login, logout,
   }), [
     addToCart, adjustGuests, bumpTicket, cart, cartMode, cartOpen, cartService, cartSubtotal, cartTax,
     authLoading, cartTotal, clearCart, demoMode, isMutating, login, logout, markTicketItemReady, menu, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill,
-    selectedTableId, serveOrder, session, settleOrder, startTicket, tables, tickets, toasts, updateLineQuantity,
+    closeTableSession, openTableSession, selectedTableId, serveOrder, session, settleOrder, startTicket, markTicketReady, tables, tickets, toasts, updateLineQuantity, updateTableSession,
   ]);
 
   return <PosContext.Provider value={value}>{children}</PosContext.Provider>;

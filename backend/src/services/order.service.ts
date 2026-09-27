@@ -1,6 +1,7 @@
 import { Types, type HydratedDocument } from "mongoose";
 
 import type { Permission, Role } from "../domain/access.js";
+import { assertTableCapacity } from "../domain/tableCapacity.js";
 import {
   canTransitionItem,
   canTransitionOrder,
@@ -120,11 +121,13 @@ async function resolveTableContext(actor: ActorContext, input: CreateOrderInput)
   }
 
   if (!session) {
+    const guestCount = input.guestCount ?? 1;
+    assertTableCapacity(guestCount, table.capacity);
     session = await TableSessionModel.create({
       restaurantId: toObjectId(actor.restaurantId),
       tableId: table._id,
       openedByAccountId: toObjectId(actor.accountId),
-      guestCount: input.guestCount ?? 1,
+      guestCount,
       status: "OPEN"
     });
     table.status = "OCCUPIED";

@@ -8,8 +8,8 @@ import { authContext, requireAuth, requireRole } from "../middleware/auth.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { createNotification } from "../services/notification.service.js";
 import { createOrder, findOrderForActor } from "../services/order.service.js";
-import { listTables, openTableSession } from "../services/table.service.js";
-import { orderParamsSchema, tableOpenRequestSchema, waiterTableOrderRequestSchema } from "./schemas.js";
+import { listTables, openTableSession, updateTableSession } from "../services/table.service.js";
+import { orderParamsSchema, tableOpenRequestSchema, tableSessionUpdateRequestSchema, waiterTableOrderRequestSchema } from "./schemas.js";
 
 export const waiterRouter = Router();
 
@@ -26,6 +26,12 @@ waiterRouter.post("/tables/:id/open", validateRequest(tableOpenRequestSchema), a
     table: { id: result.table._id.toString(), status: result.table.status },
     session: { id: result.session._id.toString(), status: result.session.status, guestCount: result.session.guestCount }
   }, 201);
+}));
+
+waiterRouter.patch("/tables/:id/session", validateRequest(tableSessionUpdateRequestSchema), asyncHandler(async (request, response) => {
+  const body = request.body as { guestCount: number; note?: string };
+  const result = await updateTableSession(authContext(request), validatedParam(request, "id"), body.guestCount, body.note);
+  sendSuccess(response, { table: { id: result.table._id.toString(), status: result.table.status }, session: { id: result.session._id.toString(), status: result.session.status, guestCount: result.session.guestCount, notes: result.session.notes } });
 }));
 
 waiterRouter.post("/tables/:id/orders", validateRequest(waiterTableOrderRequestSchema), asyncHandler(async (request, response) => {

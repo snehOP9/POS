@@ -177,6 +177,10 @@ export const api = {
       apiRequest<unknown>(`/kitchen/tickets/${ticketId}/items/${lineId}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
   },
   waiter: {
+    openTable: (tableId: string, payload: { guestCount: number; note?: string }) =>
+      apiRequest<unknown>(`/waiter/tables/${tableId}/open`, { method: "POST", body: JSON.stringify(payload) }),
+    updateTableSession: (tableId: string, payload: { guestCount: number; note?: string }) =>
+      apiRequest<unknown>(`/waiter/tables/${tableId}/session`, { method: "PATCH", body: JSON.stringify(payload) }),
     listTables: () => apiRequest<unknown>("/waiter/tables"),
     createOrder: (tableId: string, payload: JsonRecord) =>
       apiRequest<unknown>(`/waiter/tables/${tableId}/orders`, { method: "POST", body: JSON.stringify(payload) }),
@@ -184,12 +188,22 @@ export const api = {
       apiRequest<unknown>(`/waiter/orders/${orderId}/bill-request`, { method: "POST" }),
   },
   tables: {
+    closeSession: (tableId: string) =>
+      apiRequest<unknown>(`/tables/${tableId}/close`, { method: "POST", body: JSON.stringify({}) }),
     list: () => apiRequest<unknown>("/tables"),
   },
   cashier: {
     listOrders: () => apiRequest<unknown>("/cashier/orders?page=1&limit=100"),
     createOrder: (payload: JsonRecord) =>
       apiRequest<unknown>("/cashier/orders", { method: "POST", body: JSON.stringify(payload) }),
+  },
+  reports: {
+    summary: (from: string, to: string) => apiRequest<unknown>(`/reports/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  },
+  shifts: {
+    current: () => apiRequest<unknown>("/shifts/current"),
+    open: (payload: JsonRecord) => apiRequest<unknown>("/shifts/open", { method: "POST", body: JSON.stringify(payload) }),
+    close: (payload: JsonRecord) => apiRequest<unknown>("/shifts/close", { method: "POST", body: JSON.stringify(payload) }),
   },
   payments: {
     cash: (payload: JsonRecord) =>

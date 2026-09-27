@@ -136,6 +136,9 @@ tool.
   do not expose `RAZORPAY_KEY_SECRET` or webhook secrets to the browser.
 - For deployment, set exact allowed frontend origins, use TLS, set
   `COOKIE_SECURE=true`, and use a managed or properly secured MongoDB setup.
+- Use [.env.production.example](.env.production.example) only as a secret-manager
+  checklist. It is intentionally non-runnable until every placeholder is
+  replaced; never deploy the local `.env.example` values.
 
 ## Verification
 
@@ -163,6 +166,7 @@ relevant panel flow. See the testing guide for the full smoke-test matrix.
 - [Operations runbook](docs/operations.md)
 - [Backup and restore](docs/backup-restore.md)
 - [Development credentials](docs/sample-credentials.md)
+- [240-item feature roadmap](docs/feature-roadmap.md)
 
 ## Production note
 

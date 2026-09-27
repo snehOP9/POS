@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { apiRoot, getAccessToken } from "@/shared/lib/api";
+import { apiIsConfigured, apiRoot, getAccessToken } from "@/shared/lib/api";
 
 export const useLiveUpdates = (onOrderEvent?: () => void) => {
   const [connected, setConnected] = useState(false);
@@ -11,6 +11,10 @@ export const useLiveUpdates = (onOrderEvent?: () => void) => {
   }, [onOrderEvent]);
 
   useEffect(() => {
+    if (!apiIsConfigured) {
+      setConnected(false);
+      return;
+    }
     const socketUrl = apiRoot.replace(/\/api\/v1$/, "");
     const socket = io(socketUrl, {
       autoConnect: true,
