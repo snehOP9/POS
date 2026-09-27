@@ -5,7 +5,7 @@ services:
     region: singapore
     plan: starter
     rootDir: .
-    buildCommand: npm ci && npm run build --workspace=@emberserve/api
+    buildCommand: npm ci --include=dev && npm run build --workspace=@emberserve/api
     startCommand: npm run start --workspace=@emberserve/api
     healthCheckPath: /ready
     autoDeployTrigger: commit
