@@ -12,6 +12,7 @@ import { ApiError, api, getAccessToken, setAccessToken } from "@/shared/lib/api"
 import { initialOrders, initialTables, initialTickets, menuItems as previewMenuItems } from "@/shared/data/demo";
 import { normalizeMenuPayload, normalizeRestaurantPricing } from "@/shared/lib/menu-adapter";
 import { normalizeOrders, normalizeTables, normalizeTickets } from "@/shared/lib/operations-adapter";
+import { clearPreviewState, createPreviewChannel, createPreviewOrigin, isNewerPreviewState, previewSeed, readPreviewState, type PreviewRestaurantState, writePreviewState } from "@/shared/lib/preview-state";
 import type {
   AuthSession,
   CartLine,
@@ -29,11 +30,13 @@ import type {
 
 import { calculateCartPricing, cartLineLabels, cartLineTotal, cartLineUnitPrice, cartSelectionKey, fallbackRestaurantPricing, type CartSelection } from "@/shared/lib/cart";
 const cartStorageKey = "emberserve.customer-cart:v2";
+const previewCartStorageKey = "emberserve.preview-customer-cart:v1";
 const legacyCartStorageKey = "emberserve.customer-cart";
 
-const readStoredCart = (): CartLine[] => {
+const readStoredCart = (preview = false): CartLine[] => {
   try {
-    const stored = localStorage.getItem(cartStorageKey) ?? localStorage.getItem(legacyCartStorageKey);
+    const stored = localStorage.getItem(preview ? previewCartStorageKey : cartStorageKey)
+      ?? (preview ? null : localStorage.getItem(legacyCartStorageKey));
     if (!stored) return [];
     const parsed: unknown = JSON.parse(stored);
     if (!Array.isArray(parsed)) return [];
@@ -111,7 +114,8 @@ interface PosStore {
   session?: AuthSession;
   authLoading: boolean;
   demoMode: boolean;
-  isMutating: boolean;
+  isPending: (operation: string) => boolean;
+  resetPreview: () => void;
   addToCart: (item: MenuItem, selection?: CartSelection) => void;
   updateLineQuantity: (lineId: string, adjustment: number) => void;
   clearCart: () => void;
@@ -138,7 +142,7 @@ interface PosStore {
 const PosContext = createContext<PosStore | undefined>(undefined);
 
 export const PosProvider = ({ children }: PropsWithChildren) => {
-  const [cart, setCart] = useState<CartLine[]>(readStoredCart);
+  const [cart, setCart] = useState<CartLine[]>(() => readStoredCart());
   const [cartMode, setCartMode] = useState<DiningMode>("DINE_IN");
   const [cartOpen, setCartOpen] = useState(false);
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -153,8 +157,13 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<AuthSession>();
   const [authLoading, setAuthLoading] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
-  const [isMutating, setIsMutating] = useState(false);
+  const [pendingOperations, setPendingOperations] = useState<Set<string>>(() => new Set());
   const restoreAttempt = useRef(0);
+  const pendingOperationRef = useRef(new Set<string>());
+  const previewOrigin = useRef(createPreviewOrigin());
+  const previewStateRef = useRef<PreviewRestaurantState>();
+  const applyingPreviewState = useRef(false);
+  const previewChannelRef = useRef<BroadcastChannel>();
 
   useEffect(() => {
     const attempt = ++restoreAttempt.current;
@@ -186,11 +195,11 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
 
   useEffect(() => {
     try {
-      localStorage.setItem(cartStorageKey, JSON.stringify(cart));
-      localStorage.removeItem(legacyCartStorageKey);
+      localStorage.setItem(demoMode ? previewCartStorageKey : cartStorageKey, JSON.stringify(cart));
+      if (!demoMode) localStorage.removeItem(legacyCartStorageKey);
     } catch {
     }
-  }, [cart]);
+  }, [cart, demoMode]);
 
   const notify = useCallback((message: string, tone: ToastMessage["tone"] = "success") => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -199,6 +208,46 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 4_000);
   }, []);
+
+  const startOperation = useCallback((operation: string): boolean => {
+    if (pendingOperationRef.current.has(operation)) {
+      notify("That action is already being saved.", "info");
+      return false;
+    }
+    pendingOperationRef.current.add(operation);
+    setPendingOperations(new Set(pendingOperationRef.current));
+    return true;
+  }, [notify]);
+
+  const finishOperation = useCallback((operation: string) => {
+    pendingOperationRef.current.delete(operation);
+    setPendingOperations(new Set(pendingOperationRef.current));
+  }, []);
+
+  const isPending = useCallback((operation: string) => pendingOperations.has(operation), [pendingOperations]);
+
+  const applyPreviewState = useCallback((next: PreviewRestaurantState) => {
+    applyingPreviewState.current = true;
+    previewStateRef.current = next;
+    setTables(next.tables);
+    setOrders(next.orders);
+    setTickets(next.tickets);
+  }, []);
+
+  const resetPreview = useCallback(() => {
+    const next = previewSeed(previewOrigin.current);
+    clearPreviewState();
+    writePreviewState(next);
+    previewChannelRef.current?.postMessage(next);
+    applyPreviewState(next);
+    setCart([]);
+    try {
+      localStorage.removeItem(previewCartStorageKey);
+    } catch {
+      // Storage is optional; the in-memory reset remains deterministic.
+    }
+    notify("Preview restaurant reset to its seeded state.", "success");
+  }, [applyPreviewState, notify]);
 
   const refreshMenu = useCallback(() => {
     if (demoMode) {
@@ -260,15 +309,62 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
 
   useEffect(() => {
     if (demoMode) {
-      setTables(initialTables);
-      setOrders(initialOrders);
-      setTickets(initialTickets);
-      return;
+      const channel = createPreviewChannel();
+      previewChannelRef.current = channel;
+      const applyIncoming = (value: unknown) => {
+        if (!value || typeof value !== "object") return;
+        const next = value as PreviewRestaurantState;
+        if (!Array.isArray(next.tables) || !Array.isArray(next.orders) || !Array.isArray(next.tickets)) return;
+        if (isNewerPreviewState(next, previewStateRef.current)) applyPreviewState(next);
+      };
+      const stored = readPreviewState();
+      const initial = stored ?? previewSeed(previewOrigin.current);
+      if (!stored) writePreviewState(initial);
+      applyPreviewState(initial);
+      setCart(readStoredCart(true));
+      if (channel) channel.onmessage = (event: MessageEvent<unknown>) => applyIncoming(event.data);
+      const onStorage = (event: StorageEvent) => {
+        if (event.key !== "emberserve.preview-restaurant:v1" || !event.newValue) return;
+        try {
+          applyIncoming(JSON.parse(event.newValue));
+        } catch {
+          // Invalid external storage is ignored instead of contaminating Preview state.
+        }
+      };
+      window.addEventListener("storage", onStorage);
+      return () => {
+        window.removeEventListener("storage", onStorage);
+        channel?.close();
+        if (previewChannelRef.current === channel) previewChannelRef.current = undefined;
+      };
     }
+    previewStateRef.current = undefined;
+    applyingPreviewState.current = false;
     setTables([]);
     setOrders([]);
     setTickets([]);
-  }, [demoMode]);
+    setCart(readStoredCart());
+    return undefined;
+  }, [applyPreviewState, demoMode]);
+
+  useEffect(() => {
+    if (!demoMode) return;
+    if (applyingPreviewState.current) {
+      applyingPreviewState.current = false;
+      return;
+    }
+    const previous = previewStateRef.current;
+    const next: PreviewRestaurantState = {
+      revision: Math.max(Date.now(), (previous?.revision ?? 0) + 1),
+      origin: previewOrigin.current,
+      tables,
+      orders,
+      tickets,
+    };
+    previewStateRef.current = next;
+    writePreviewState(next);
+    previewChannelRef.current?.postMessage(next);
+  }, [demoMode, orders, tables, tickets]);
 
   const addToCart = useCallback((item: MenuItem, selection: CartSelection = {}) => {
     if (item.unavailable) {
