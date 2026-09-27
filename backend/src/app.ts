@@ -37,7 +37,7 @@ export function createApp() {
     request.requestId = request.header("x-request-id") ?? randomUUID();
     response.setHeader("X-Request-Id", request.requestId);
     response.on("finish", () => {
-      logger.info({ requestId: request.requestId, method: request.method, path: request.originalUrl, statusCode: response.statusCode }, "HTTP request completed");
+      logger.info({ requestId: request.requestId, method: request.method, path: request.path, statusCode: response.statusCode }, "HTTP request completed");
     });
     next();
   });
