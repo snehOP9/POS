@@ -42,6 +42,11 @@ jobs:
 
       - name: Run tests
         run: npm test
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://127.0.0.1:27017/emberserve-ci
+          JWT_ACCESS_SECRET: ci-only-access-secret-with-at-least-thirty-two-characters
+          JWT_REFRESH_SECRET: ci-only-refresh-secret-with-at-least-thirty-two-characters
 
       - name: Build shared package
         run: npm run build --workspace=@emberserve/shared
