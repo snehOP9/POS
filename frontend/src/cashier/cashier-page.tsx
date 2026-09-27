@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BarChart3, Bell, Check, ChevronDown, CircleHelp, Clock3, LayoutGrid, LockKeyhole, MenuSquare, Minus, MoreHorizontal, Plus, ReceiptText, Search, Settings2, ShoppingBasket, Table2, UtensilsCrossed, WalletCards } from "lucide-react";
 import { Brand } from "@/shared/components/brand";
@@ -54,9 +54,6 @@ export const CashierPage = () => {
   const navigate = useNavigate();
   const now = useClock(30_000);
   const live = useLiveUpdates(refreshOperations);
-  useEffect(() => {
-    if (!demoMode && cartMode === "DINE_IN" && !tables.length) setCartMode("COUNTER");
-  }, [cartMode, demoMode, setCartMode, tables.length]);
   const selectedTable = tables.find((table) => table.id === selectedTableId);
   const cashierCategories = ["All", ...new Set(menu.map((item) => item.category))];
   const filteredItems = useMemo(() => menu.filter((item) => {
