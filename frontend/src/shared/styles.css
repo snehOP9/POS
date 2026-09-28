@@ -208,7 +208,8 @@ small { color: var(--text-muted); }
   .cashier-operations-panel, .cashier-report-panel { margin: 12px; padding: 14px; }
   .report-metrics, .report-breakdowns { gap: 8px; }
   .waiter-layout { margin-bottom: calc(72px + env(safe-area-inset-bottom)); }
-  .waiter-mobile-nav button { min-width: 44px; min-height: 44px; place-items: center; }
+  .waiter-mobile-nav { overflow-x: clip; }
+  .waiter-mobile-nav button { min-width: 0; min-height: 44px; flex: 1 1 0; place-items: center; }
   .preview-reset-control { bottom: calc(72px + env(safe-area-inset-bottom)); }
   .mobile-cart-bar { bottom: max(13px, env(safe-area-inset-bottom)); }
 }
