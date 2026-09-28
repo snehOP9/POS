@@ -195,3 +195,32 @@ small { color: var(--text-muted); }
 .catalogue-groups { display: grid; gap: 13px; }.catalogue-group { border: 1px solid var(--border-subtle); border-radius: 13px; overflow: hidden; }.catalogue-group>header { justify-content: space-between; padding: 11px 13px; background: #faf6ef; }.catalogue-group h3 { margin: 0; font-size: .83rem; }.catalogue-group header small, .catalogue-item small { color: var(--text-muted); font-size: .62rem; }.catalogue-group>header>b { display: grid; min-width: 23px; height: 23px; place-items: center; border-radius: 7px; background: #ece4d8; color: var(--text-secondary); font-size: .65rem; }.catalogue-item { min-height: 67px; border-top: 1px solid var(--border-subtle); padding: 8px 10px; }.catalogue-item>.food-visual { flex: none; }.catalogue-item>div:nth-child(2) { display: grid; min-width: 0; gap: 2px; }.catalogue-item strong { overflow: hidden; font-size: .73rem; text-overflow: ellipsis; white-space: nowrap; }.catalogue-item span { color: var(--text-secondary); font-size: .64rem; }.catalogue-item span s { margin-right: 3px; color: var(--text-muted); }.catalogue-item__controls { flex-wrap: wrap; justify-content: end; margin-left: auto; }.catalogue-item__controls .icon-button { width: 29px; height: 29px; }.catalogue-item__controls .outline-button, .catalogue-item__controls .quiet-button { min-height: 29px; padding: 5px 7px; font-size: .62rem; }.catalogue-item__archive { color: #a4463e; }.catalogue-group__empty { margin: 0; padding: 13px; color: var(--text-muted); font-size: .68rem; }
 @media (max-width: 820px) { .menu-management-panel { margin: 0 13px 17px; }.menu-management-panel__header { display: grid; }.menu-management-panel__header>div:last-child { justify-content: start; }.catalogue-form, .catalogue-form--category { grid-template-columns: repeat(2, minmax(0, 1fr)); }.catalogue-item { align-items: start; }.catalogue-item__controls { margin-top: 3px; }.catalogue-item__controls .outline-button, .catalogue-item__controls .quiet-button { display: none; }.catalogue-item__controls .icon-button { display: grid; } }
 @media (max-width: 520px) { .catalogue-form, .catalogue-form--category { grid-template-columns: 1fr; }.catalogue-form__actions { align-items: stretch; flex-direction: column-reverse; }.catalogue-form__actions .button { justify-content: center; }.catalogue-item { grid-template-columns: 48px 1fr; display: grid; }.catalogue-item__controls { grid-column: 1 / -1; margin-left: 0; justify-content: start; }.catalogue-item__controls .outline-button, .catalogue-item__controls .quiet-button { display: inline-flex; }.menu-management-panel__header .button, .menu-management-panel__header .outline-button { flex: 1; justify-content: center; } }
+
+/* Device hardening: touch targets, safe areas, and compact register controls. */
+@media (max-width: 620px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
+  .cart-drawer { height: 100dvh; max-height: 100dvh; }
+  .modal-backdrop { padding: 12px; }
+  .dish-dialog { max-height: calc(100dvh - 24px); }
+  .dish-dialog > .food-visual { min-height: min(170px, 24dvh); }
+  .cashier-guest-control { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+  .cashier-guest-control > small { flex-basis: 100%; }
+  .cashier-operations-panel, .cashier-report-panel { margin: 12px; padding: 14px; }
+  .report-metrics, .report-breakdowns { gap: 8px; }
+  .waiter-layout { margin-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .waiter-mobile-nav button { min-width: 44px; min-height: 44px; place-items: center; }
+  .preview-reset-control { bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .mobile-cart-bar { bottom: max(13px, env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 420px) {
+  .cashier-header__tools { gap: 6px; }
+  .cashier-time { display: none; }
+  .cashier-products__top { gap: 8px; }
+  .order-mode-row, .table-selector, .cashier-guest-control, .pos-bill__lines, .pos-bill__totals, .payment-section, .pos-bill__footnote { margin-right: 13px; margin-left: 13px; }
+  .pos-pay-button { width: calc(100% - 26px); margin-right: 13px; margin-left: 13px; }
+  .table-grid { gap: 8px; }
+  .table-card__foot { align-items: flex-start; flex-direction: column; }
+  .waiter-section-heading { align-items: flex-start; gap: 10px; }
+  .waiter-section-heading .outline-button { min-height: 36px; padding-right: 8px; padding-left: 8px; }
+}
