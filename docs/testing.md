@@ -7,7 +7,9 @@ and response serializers:
 
 ~~~powershell
 npm run typecheck
+npm run lint
 npm run test
+npm run test:e2e --workspace=@emberserve/web
 npm run build
 ~~~
 
@@ -19,9 +21,12 @@ npm run typecheck --workspace=@emberserve/api
 npm run build --workspace=@emberserve/web
 ~~~
 
-There is no configured workspace linter, integration-test suite, or
-Playwright/Cypress runner at present. Do not describe those as existing
-automated coverage.
+The workspace linter is a strict ESLint gate. The Playwright suite runs only
+against the local Vite Preview flow; it does not call an API, create Atlas
+orders, or make payments. It verifies deterministic Preview cross-tab state,
+the keyboard menu search, and serious/critical WCAG 2 A/AA issues through axe.
+Use a disposable test database for API integration coverage; it is not yet a
+substitute for browser checks.
 
 ## Current smoke checks
 

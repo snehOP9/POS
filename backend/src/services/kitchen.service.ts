@@ -125,7 +125,7 @@ export async function kitchenTicketViews(actor: ActorContext, station?: string, 
   });
 }
 
-export async function setTicketPriority(actor: ActorContext, ticketId: string, priority: "NORMAL" | "PRIORITY" | "RUSH" | "REFIRE", reason: string) {
+export async function setTicketPriority(actor: ActorContext, ticketId: string, priority: "NORMAL" | "PRIORITY" | "RUSH" | "REFIRE", _reason: string) {
   if (actor.role !== "CASHIER" || !actor.permissions.includes("canOverridePrice")) {
     throw forbidden("AUTH_MISSING_PERMISSION", "Setting kitchen priority requires supervisor permission");
   }
