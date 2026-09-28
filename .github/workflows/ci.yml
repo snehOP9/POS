@@ -39,6 +39,9 @@ jobs:
 
       - name: Typecheck workspaces
         run: npm run typecheck
+      - name: Lint workspaces
+        run: npm run lint
+
 
       - name: Run tests
         run: npm test
@@ -47,6 +50,12 @@ jobs:
           MONGODB_URI: mongodb://127.0.0.1:27017/emberserve-ci
           JWT_ACCESS_SECRET: ci-only-access-secret-with-at-least-thirty-two-characters
           JWT_REFRESH_SECRET: ci-only-refresh-secret-with-at-least-thirty-two-characters
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run isolated Preview browser checks
+        run: npm run test:e2e --workspace=@emberserve/web
+
 
       - name: Build shared package
         run: npm run build --workspace=@emberserve/shared

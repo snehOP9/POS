@@ -2,6 +2,7 @@ import type { CartLine, CartModifierSelection, MenuItem, MenuModifierOption, Men
 
 export interface CartSelection {
   variant?: MenuVariant;
+  note?: string;
   modifiers?: CartModifierSelection[];
 }
 
@@ -23,11 +24,12 @@ export const unitPriceForSelection = (item: MenuItem, selection: CartSelection =
 
 export const cartLineUnitPrice = (line: CartLine): number => unitPriceForSelection(line.item, line);
 export const cartLineTotal = (line: CartLine): number => cartLineUnitPrice(line) * line.quantity;
-export const cartLineLabels = (line: Pick<CartLine, "variant" | "modifiers">): string[] => [
+export const cartLineLabels = (line: Pick<CartLine, "variant" | "modifiers" | "note">): string[] => [
   ...(line.variant ? [line.variant.name] : []),
   ...(line.modifiers?.map((modifier) => modifier.name) ?? []),
+  ...(line.note ? [`Note: ${line.note}`] : []),
 ];
-export const cartSelectionKey = (item: MenuItem, selection: CartSelection = {}): string => [item.id, selection.variant?.id ?? "standard", ...(selection.modifiers ?? []).map((modifier) => modifier.id).sort()].join("|");
+export const cartSelectionKey = (item: MenuItem, selection: CartSelection = {}): string => [item.id, selection.variant?.id ?? "standard", ...(selection.modifiers ?? []).map((modifier) => modifier.id).sort(), selection.note?.trim() ?? ""].join("|");
 export const selectionForOption = (group: { id: string; name: string }, option: MenuModifierOption): CartModifierSelection => ({ ...option, groupId: group.id, groupName: group.name });
 
 export const calculateCartPricing = (subtotal: number, pricing: RestaurantPricingConfig): CartPricing => {

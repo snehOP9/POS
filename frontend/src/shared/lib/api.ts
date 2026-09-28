@@ -159,6 +159,8 @@ export const api = {
       if (filters?.available) query.set("available", "true");
       return apiRequest<unknown>(`/menu${query.size ? `?${query.toString()}` : ""}`);
     },
+    setAvailability: (itemId: string, available: boolean) =>
+      apiRequest<unknown>(`/menu/items/${itemId}/availability`, { method: "PATCH", body: JSON.stringify({ available }) }),
   },
   orders: {
     list: () => apiRequest<unknown>("/orders?page=1&limit=100"),
@@ -208,5 +210,9 @@ export const api = {
   payments: {
     cash: (payload: JsonRecord) =>
       apiRequest<unknown>("/payments/cash", { method: "POST", body: JSON.stringify(payload) }),
+  },
+  notifications: {
+    list: () => apiRequest<unknown>("/notifications?page=1&limit=30"),
+    markRead: (notificationId: string) => apiRequest<unknown>(`/notifications/${notificationId}/read`, { method: "PATCH", body: JSON.stringify({}) }),
   },
 };

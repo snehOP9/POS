@@ -18,9 +18,6 @@ import {
   updateMenuAvailabilityRequestSchema
 } from "./schemas.js";
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 function displayStation(station: string): string {
   return station.toLowerCase().replace(/(^|_)([a-z])/g, (_match, prefix: string, letter: string) => `${prefix ? " " : ""}${letter.toUpperCase()}`);
