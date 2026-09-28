@@ -9,6 +9,7 @@ import { StatusPill } from "@/shared/components/status-pill";
 import { restaurant } from "@/shared/data/demo";
 import { useLiveUpdates } from "@/shared/hooks/useLiveUpdates";
 import { useDialogFocus } from "@/shared/hooks/useDialogFocus";
+import { requiresConfiguration } from "@/shared/components/item-configurator";
 import { formatMoney } from "@/shared/lib/format";
 import { usePos } from "@/shared/store/pos-store";
 import { selectionForOption, unitPriceForSelection } from "@/shared/lib/cart";
@@ -20,6 +21,7 @@ const heat = (level = 0) => "●".repeat(level);
 
 const MenuCard = ({ item, onCustomize }: { item: MenuItem; onCustomize: (item: MenuItem) => void }) => {
   const { cart, addToCart, updateLineQuantity } = usePos();
+  const configurable = requiresConfiguration(item);
   const line = cart.find((candidate) => candidate.item.id === item.id && !candidate.modifiers?.length);
   return (
     <article className={`menu-card ${item.unavailable ? "menu-card--unavailable" : ""}`}>
@@ -32,7 +34,7 @@ const MenuCard = ({ item, onCustomize }: { item: MenuItem; onCustomize: (item: M
         <div className="menu-card__meta"><span className={`dietary-dot dietary-dot--${item.dietary}`} role="img" aria-label={item.dietary} /> <span>{item.category}</span>{item.heat ? <span className="heat">{heat(item.heat)}</span> : null}</div>
         <button className="text-button menu-card__title" type="button" onClick={() => onCustomize(item)}>{item.name}</button>
         <p>{item.description}</p>
-        <div className="menu-card__bottom"><strong>{formatMoney(item.price)}</strong>{line ? <QuantityControl quantity={line.quantity} onChange={(adjustment) => updateLineQuantity(line.id, adjustment)} compact /> : <button type="button" className="add-button" onClick={() => addToCart(item)} disabled={item.unavailable}>Add <span>+</span></button>}</div>
+        <div className="menu-card__bottom"><strong>{formatMoney(item.price)}</strong>{line ? <QuantityControl quantity={line.quantity} onChange={(adjustment) => updateLineQuantity(line.id, adjustment)} compact /> : <button type="button" className="add-button" onClick={() => configurable ? onCustomize(item) : addToCart(item)} disabled={item.unavailable}>{configurable ? "Customize" : "Add"} <span>+</span></button>}</div>
       </div>
     </article>
   );
