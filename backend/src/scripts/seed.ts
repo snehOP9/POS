@@ -14,10 +14,6 @@ async function seed(): Promise<void> {
   if (env.NODE_ENV === "production" && !env.ALLOW_PRODUCTION_SEED) {
     throw new Error("Refusing to seed production. Set ALLOW_PRODUCTION_SEED=true only for an intentional, controlled demo seed.");
   }
-  const demoPassword = env.SEED_DEMO_PASSWORD ?? (env.NODE_ENV === "development" ? "demo-password" : undefined);
-  if (!demoPassword) {
-    throw new Error("SEED_DEMO_PASSWORD is required outside development");
-  }
   await connectDatabase();
   const restaurant = await RestaurantConfigModel.findOneAndUpdate(
     { name: "EmberServe Demo Restaurant" },
@@ -43,31 +39,29 @@ async function seed(): Promise<void> {
   );
   if (!restaurant) throw new Error("Unable to create restaurant configuration");
 
-  const passwordHash = await hashPassword(demoPassword);
-  const accounts = await Promise.all([
-    AccountModel.findOneAndUpdate(
-      { restaurantId: restaurant._id, email: "cashier@ember.local" },
-      { $set: { displayName: "Aarav Cashier", passwordHash, role: "CASHIER", permissions: CASHIER_SUPERVISOR_PERMISSIONS, active: true } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    ),
-    AccountModel.findOneAndUpdate(
-      { restaurantId: restaurant._id, email: "waiter@ember.local" },
-      { $set: { displayName: "Mira Waiter", passwordHash, role: "WAITER", permissions: [], active: true } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    ),
-    AccountModel.findOneAndUpdate(
-      { restaurantId: restaurant._id, email: "kitchen@ember.local" },
-      { $set: { displayName: "Kabir Kitchen", passwordHash, role: "KITCHEN", permissions: [], active: true } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    ),
-    AccountModel.findOneAndUpdate(
-      { restaurantId: restaurant._id, email: "guest@ember.local" },
-      { $set: { displayName: "Guest Customer", passwordHash, role: "CUSTOMER", permissions: [], active: true } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    )
-  ]);
-  const waiter = accounts[1];
-  if (!waiter) throw new Error("Unable to create waiter account");
+  const existingAccounts = await AccountModel.find({ restaurantId: restaurant._id });
+  const createdDemoAccounts = existingAccounts.length === 0;
+  let waiter = existingAccounts.find((account) => account.role === "WAITER" && account.active);
+
+  if (createdDemoAccounts) {
+    const demoPassword = env.SEED_DEMO_PASSWORD ?? (env.NODE_ENV === "development" ? "demo-password" : undefined);
+    if (!demoPassword) {
+      throw new Error("SEED_DEMO_PASSWORD is required only when creating fresh demo accounts outside development");
+    }
+    const passwordHash = await hashPassword(demoPassword);
+    const accounts = await Promise.all([
+      AccountModel.create({ restaurantId: restaurant._id, email: "cashier@ember.local", displayName: "Aarav Cashier", passwordHash, role: "CASHIER", permissions: CASHIER_SUPERVISOR_PERMISSIONS, active: true }),
+      AccountModel.create({ restaurantId: restaurant._id, email: "waiter@ember.local", displayName: "Mira Waiter", passwordHash, role: "WAITER", permissions: [], active: true }),
+      AccountModel.create({ restaurantId: restaurant._id, email: "kitchen@ember.local", displayName: "Kabir Kitchen", passwordHash, role: "KITCHEN", permissions: [], active: true }),
+      AccountModel.create({ restaurantId: restaurant._id, email: "guest@ember.local", displayName: "Guest Customer", passwordHash, role: "CUSTOMER", permissions: [], active: true })
+    ]);
+    waiter = accounts.find((account) => account.role === "WAITER");
+    logger.info({ restaurantId: restaurant._id.toString() }, "Created fresh demo staff accounts");
+  } else {
+    logger.info({ restaurantId: restaurant._id.toString(), accountCount: existingAccounts.length }, "Preserved existing staff accounts and credentials");
+  }
+
+  if (!waiter) throw new Error("Unable to find an active waiter account; refusing to modify existing staff");
 
   const pexels = (id: string) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=1200`;
   const categorySpecs = [
@@ -134,8 +128,10 @@ async function seed(): Promise<void> {
     );
   }));
 
-  logger.info({ restaurantId: restaurant._id.toString() }, "Seed complete");
-  logger.info({ demoPassword: env.NODE_ENV === "development" ? demoPassword : "configured via SEED_DEMO_PASSWORD" }, "Demo credentials: cashier@ember.local, waiter@ember.local, kitchen@ember.local, guest@ember.local");
+  logger.info({ restaurantId: restaurant._id.toString(), createdDemoAccounts }, "Seed complete");
+  if (createdDemoAccounts) {
+    logger.info({ demoPassword: env.NODE_ENV === "development" ? "demo-password" : "configured via SEED_DEMO_PASSWORD" }, "Created demo credentials: cashier@ember.local, waiter@ember.local, kitchen@ember.local, guest@ember.local");
+  }
 }
 
 seed()
