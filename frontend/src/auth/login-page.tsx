@@ -17,15 +17,15 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = usePos();
   const [role, setRole] = useState<Role>("CASHIER");
-  const [email, setEmail] = useState(() => window.localStorage.getItem("emberserve.rememberedStaffId") ?? roleDetails.CASHIER.email);
-  const [password, setPassword] = useState("demo-password");
+  const [email, setEmail] = useState(() => window.localStorage.getItem("emberserve.rememberedStaffId") ?? "");
+  const [password, setPassword] = useState("");
   const [rememberDevice, setRememberDevice] = useState(() => Boolean(window.localStorage.getItem("emberserve.rememberedStaffId")));
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = useState("");
   const details = roleDetails[role];
   const selectRole = (nextRole: Role) => {
     setRole(nextRole);
-    setEmail(roleDetails[nextRole].email);
+    if (!rememberDevice) setEmail("");
     setMessage("");
   };
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
