@@ -5,6 +5,7 @@ import { CASHIER_SUPERVISOR_PERMISSIONS } from "../domain/access.js";
 import { opaqueToken } from "../lib/ids.js";
 import { AccountModel } from "../models/Account.js";
 import { CategoryModel } from "../models/Category.js";
+import { expandedCatalogue } from "./seed-catalogue.js";
 import { DiningTableModel } from "../models/DiningTable.js";
 import { MenuItemModel } from "../models/MenuItem.js";
 import { RestaurantConfigModel } from "../models/RestaurantConfig.js";
@@ -70,7 +71,13 @@ async function seed(): Promise<void> {
     { name: "Mains", description: "Comforting curries and signature bowls.", imageUrl: pexels("36009039"), sortOrder: 3 },
     { name: "Rice & Breads", description: "Aromatic rice and fresh flatbreads.", imageUrl: pexels("20446413"), sortOrder: 4 },
     { name: "Coolers", description: "Freshly mixed, zero-proof drinks.", imageUrl: pexels("17200460"), sortOrder: 5 },
-    { name: "Sweet Finish", description: "A small, memorable ending.", imageUrl: pexels("7449105"), sortOrder: 6 }
+    { name: "Sweet Finish", description: "A small, memorable ending.", imageUrl: pexels("7449105"), sortOrder: 6 },
+    { name: "Soups & Chaats", description: "Comforting bowls and bright, tangy chaat.", imageUrl: pexels("21078315"), sortOrder: 7 },
+    { name: "Coastal Kitchen", description: "Coconut, curry leaf and market-fresh coastal cooking.", imageUrl: pexels("14731625"), sortOrder: 8 },
+    { name: "Regional Classics", description: "Celebrated recipes from across India.", imageUrl: pexels("28675074"), sortOrder: 9 },
+    { name: "Street Favourites", description: "Big-flavour bites inspired by the street.", imageUrl: pexels("21078315"), sortOrder: 10 },
+    { name: "Bowls & Light Meals", description: "Balanced, satisfying meals for any time of day.", imageUrl: pexels("28674705"), sortOrder: 11 },
+    { name: "Breakfast & Brunch", description: "Slow mornings, familiar comfort and fresh starts.", imageUrl: pexels("20446413"), sortOrder: 12 }
   ];
   const categories = await Promise.all(categorySpecs.map((spec) => CategoryModel.findOneAndUpdate(
     { restaurantId: restaurant._id, name: spec.name },
@@ -84,7 +91,7 @@ async function seed(): Promise<void> {
     return category._id;
   };
 
-  const menuSpecs = [
+  const coreMenuSpecs = [
     { name: "Saffron Paneer Tikka", category: "Small Plates", description: "Charred paneer, kasundi glaze, mint ash.", imageUrl: pexels("33430556"), basePricePaise: 42500, offer: { percentage: 10, label: "Lunch special" }, foodType: "VEGETARIAN", station: "TANDOOR", preparationMinutes: 14, featured: true, variants: [], modifierGroups: [{ id: "heat", name: "Heat level", minSelections: 0, maxSelections: 1, options: [{ id: "heat-mild", name: "Mild", priceDeltaPaise: 0, available: true }, { id: "heat-hot", name: "Extra hot", priceDeltaPaise: 0, available: true }] }] },
     { name: "Dahi ke Kebab", category: "Small Plates", description: "Silky hung curd kebabs with coriander and tamarind.", imageUrl: pexels("21078315"), basePricePaise: 29500, foodType: "VEGETARIAN", station: "COLD", preparationMinutes: 9, featured: false, variants: [], modifierGroups: [] },
     { name: "Amritsari Fish Bites", category: "Small Plates", description: "Crisp coastal fish, ajwain, lime and pickled onion.", imageUrl: "https://images.unsplash.com/photo-1756741987051-a6a38f28838b?auto=format&fit=crop&w=1200&q=82", basePricePaise: 44500, foodType: "NON_VEGETARIAN", station: "HOT", preparationMinutes: 13, featured: true, variants: [], modifierGroups: [] },
@@ -110,6 +117,7 @@ async function seed(): Promise<void> {
     { name: "Dark Chocolate Kulfi", category: "Sweet Finish", description: "Single-origin chocolate and salted cashew praline.", imageUrl: pexels("7449105"), basePricePaise: 26500, foodType: "VEGETARIAN", station: "COLD", preparationMinutes: 4, featured: true, variants: [], modifierGroups: [] },
     { name: "Gulab Jamun", category: "Sweet Finish", description: "Warm cardamom syrup, rose petal and pistachio.", imageUrl: pexels("11887844"), basePricePaise: 18500, foodType: "VEGETARIAN", station: "COLD", preparationMinutes: 4, featured: false, variants: [], modifierGroups: [] }
   ] as const;
+  const menuSpecs = [...coreMenuSpecs, ...expandedCatalogue(pexels)];
   await Promise.all(menuSpecs.map((spec) => MenuItemModel.findOneAndUpdate(
     { restaurantId: restaurant._id, name: spec.name },
     { $set: { ...spec, categoryId: categoryId(spec.category), available: true, archived: false, allergens: [], spiceLevel: 1 } },
