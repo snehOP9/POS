@@ -24,6 +24,11 @@ export interface ModifierGroup {
   options: ModifierOption[];
 }
 
+export interface MenuOffer {
+  percentage: number;
+  label: string;
+}
+
 export interface MenuItem {
   restaurantId: Types.ObjectId;
   categoryId: Types.ObjectId;
@@ -31,10 +36,12 @@ export interface MenuItem {
   description?: string;
   imageUrl?: string;
   basePricePaise: number;
+  offer?: MenuOffer;
   foodType: FoodType;
   allergens: string[];
   spiceLevel: number;
   available: boolean;
+  archived: boolean;
   featured: boolean;
   station: string;
   preparationMinutes: number;
@@ -75,6 +82,14 @@ const modifierGroupSchema = new Schema<ModifierGroup>(
   { _id: false }
 );
 
+const menuOfferSchema = new Schema<MenuOffer>(
+  {
+    percentage: { type: Number, required: true, min: 1, max: 90 },
+    label: { type: String, required: true, trim: true, maxlength: 80 }
+  },
+  { _id: false }
+);
+
 const menuItemSchema = new Schema<MenuItem>(
   {
     restaurantId: { type: Schema.Types.ObjectId, ref: "RestaurantConfig", required: true, index: true },
@@ -83,10 +98,12 @@ const menuItemSchema = new Schema<MenuItem>(
     description: { type: String, trim: true, maxlength: 1000 },
     imageUrl: { type: String, trim: true, maxlength: 2048 },
     basePricePaise: { type: Number, required: true, min: 0 },
+    offer: { type: menuOfferSchema },
     foodType: { type: String, enum: ["VEGETARIAN", "NON_VEGETARIAN", "VEGAN"], default: "VEGETARIAN" },
     allergens: { type: [String], default: [] },
     spiceLevel: { type: Number, default: 0, min: 0, max: 5 },
     available: { type: Boolean, default: true, index: true },
+    archived: { type: Boolean, default: false, index: true },
     featured: { type: Boolean, default: false, index: true },
     station: { type: String, default: "MAIN", trim: true, uppercase: true, maxlength: 40 },
     preparationMinutes: { type: Number, default: 15, min: 0, max: 240 },
@@ -96,8 +113,8 @@ const menuItemSchema = new Schema<MenuItem>(
   { timestamps: true, versionKey: "version" }
 );
 
-menuItemSchema.index({ restaurantId: 1, categoryId: 1, available: 1 });
-menuItemSchema.index({ restaurantId: 1, featured: 1, available: 1 });
+menuItemSchema.index({ restaurantId: 1, categoryId: 1, archived: 1, available: 1 });
+menuItemSchema.index({ restaurantId: 1, featured: 1, archived: 1, available: 1 });
 menuItemSchema.index({ name: "text", description: "text" });
 
 export const MenuItemModel = model<MenuItem>("MenuItem", menuItemSchema);

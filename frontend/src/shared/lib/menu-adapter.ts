@@ -1,4 +1,4 @@
-import type { KitchenStation, MenuItem, MenuModifierGroup, MenuModifierOption, MenuVariant, RestaurantPricingConfig } from "@/shared/types/domain";
+import type { KitchenStation, MenuCategory, MenuItem, MenuModifierGroup, MenuModifierOption, MenuVariant, RestaurantPricingConfig } from "@/shared/types/domain";
 import { fallbackRestaurantPricing } from "@/shared/lib/cart";
 
 type UnknownRecord = Record<string, unknown>;
@@ -72,6 +72,8 @@ export const normalizeMenuPayload = (payload: unknown): MenuItem[] => {
     if (!item) return [];
     const categoryRecord = asRecord(item.category);
     const foodType = typeof item.foodType === "string" ? item.foodType.toUpperCase() : "";
+    const rawOffer = asRecord(item.offer);
+    const basePrice = typeof item.basePricePaise === "number" ? item.basePricePaise / 100 : readNumber(item.basePrice, readNumber(item.price, 0));
     const isVegan = item.dietary === "vegan" || foodType === "VEGAN";
     const isVegetarian = item.isVegetarian === true || item.dietary === "veg" || isVegan || foodType === "VEGETARIAN";
     const dietary = isVegan ? "vegan" : isVegetarian ? "veg" : "non-veg";
@@ -81,7 +83,11 @@ export const normalizeMenuPayload = (payload: unknown): MenuItem[] => {
       name: readString(item.name, "Seasonal dish"),
       description: readString(item.description, "Prepared fresh by our kitchen."),
       category: readString(categoryRecord?.name ?? item.categoryName ?? item.category, "Kitchen specials"),
-      price: typeof item.basePricePaise === "number" ? item.basePricePaise / 100 : readNumber(item.price ?? item.basePrice, 0),
+      categoryId: typeof item.categoryId === "string" ? item.categoryId : typeof categoryRecord?.id === "string" ? categoryRecord.id : undefined,
+      price: readNumber(item.price, basePrice),
+      basePrice,
+      offer: rawOffer && typeof rawOffer.percentage === "number" && typeof rawOffer.label === "string" ? { percentage: rawOffer.percentage, label: rawOffer.label } : undefined,
+      imageUrl: typeof item.imageUrl === "string" && item.imageUrl.trim() ? item.imageUrl : undefined,
       prepMinutes: readNumber(item.prepMinutes ?? item.preparationTime ?? item.preparationMinutes, 12),
       station: toStation(item.station),
       dietary,
@@ -93,6 +99,23 @@ export const normalizeMenuPayload = (payload: unknown): MenuItem[] => {
       tags,
       variants: variants(item.variants),
       modifierGroups: modifierGroups(item.modifierGroups),
+    }];
+  });
+};
+
+export const normalizeMenuCategories = (payload: unknown): MenuCategory[] => {
+  const data = asRecord(payload);
+  const rawCategories = Array.isArray(data?.categories) ? data.categories : [];
+  return rawCategories.flatMap((raw, index) => {
+    const category = asRecord(raw);
+    if (!category) return [];
+    return [{
+      id: readString(category.id ?? category._id, `category-${index}`),
+      name: readString(category.name, "Uncategorized"),
+      description: typeof category.description === "string" ? category.description : undefined,
+      imageUrl: typeof category.imageUrl === "string" && category.imageUrl.trim() ? category.imageUrl : undefined,
+      sortOrder: readNumber(category.sortOrder, index),
+      visible: category.visible !== false,
     }];
   });
 };

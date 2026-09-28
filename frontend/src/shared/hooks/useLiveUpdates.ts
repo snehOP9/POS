@@ -14,6 +14,7 @@ const invalidatingEvents = [
   "payment:created",
   "payment:updated",
   "notification:created",
+  "menu:updated",
 ] as const;
 
 export const useLiveUpdates = (onInvalidation?: () => void, enabled = true): LiveConnectionState => {

@@ -55,6 +55,19 @@ export interface MenuModifierGroup {
   options: MenuModifierOption[];
 }
 
+export interface MenuOffer {
+  percentage: number;
+  label: string;
+}
+
+export interface MenuCategory {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  sortOrder: number;
+  visible?: boolean;
+}
 export interface CartModifierSelection extends MenuModifierOption {
   groupId: string;
   groupName: string;
@@ -64,7 +77,11 @@ export interface MenuItem {
   name: string;
   description: string;
   category: string;
+  categoryId?: string;
   price: number;
+  basePrice?: number;
+  offer?: MenuOffer;
+  imageUrl?: string;
   prepMinutes: number;
   station: KitchenStation;
   dietary: "veg" | "non-veg" | "vegan";
