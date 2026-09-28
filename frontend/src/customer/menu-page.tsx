@@ -87,7 +87,7 @@ export const MenuPage = () => {
   const [selectedDish, setSelectedDish] = useState<MenuItem>();
   const [pickupName, setPickupName] = useState("");
   const [pickupPhone, setPickupPhone] = useState("");
-  const live = useLiveUpdates(refreshOperations, !demoMode);
+  const live = useLiveUpdates(() => { refreshOperations(); refreshMenu(); }, !demoMode);
   useEffect(() => {
     refreshMenu();
   }, [refreshMenu]);
