@@ -159,6 +159,14 @@ export const api = {
       if (filters?.available) query.set("available", "true");
       return apiRequest<unknown>(`/menu${query.size ? `?${query.toString()}` : ""}`);
     },
+    getManaged: () => apiRequest<unknown>("/menu/manage/catalogue"),
+    createCategory: (payload: JsonRecord) =>
+      apiRequest<unknown>("/menu/categories", { method: "POST", body: JSON.stringify(payload) }),
+    createItem: (payload: JsonRecord) =>
+      apiRequest<unknown>("/menu/items", { method: "POST", body: JSON.stringify(payload) }),
+    updateItem: (itemId: string, payload: JsonRecord) =>
+      apiRequest<unknown>(`/menu/items/${itemId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    archiveItem: (itemId: string) => apiRequest<unknown>(`/menu/items/${itemId}`, { method: "DELETE" }),
     setAvailability: (itemId: string, available: boolean) =>
       apiRequest<unknown>(`/menu/items/${itemId}/availability`, { method: "PATCH", body: JSON.stringify({ available }) }),
   },

@@ -20,6 +20,11 @@ export interface PriceQuote {
   pricing: OrderPricing;
 }
 
+export function effectiveBasePricePaise(menuItem: Pick<MenuItem, 'basePricePaise' | 'offer'>): number {
+  if (!menuItem.offer) return menuItem.basePricePaise;
+  return Math.round((menuItem.basePricePaise * (100 - menuItem.offer.percentage)) / 100);
+}
+
 function percentageOf(amountPaise: number, basisPoints: number): number {
   return Math.round((amountPaise * basisPoints) / 10_000);
 }
@@ -48,7 +53,7 @@ function createPricing(restaurant: RestaurantConfig, subtotalPaise: number, disc
 }
 
 function itemSnapshot(menuItem: MenuItem & { _id: Types.ObjectId }, input: OrderLineInput): OrderItemSnapshot {
-  if (!menuItem.available) {
+  if (!menuItem.available || menuItem.archived) {
     throw conflict("MENU_ITEM_UNAVAILABLE", `${menuItem.name} is currently unavailable`);
   }
 
@@ -94,13 +99,14 @@ function itemSnapshot(menuItem: MenuItem & { _id: Types.ObjectId }, input: Order
   }
 
   const modifierPricePaise = modifiers.reduce((total, modifier) => total + modifier.priceDeltaPaise, 0);
-  const unitPricePaise = menuItem.basePricePaise + (variant?.priceDeltaPaise ?? 0) + modifierPricePaise;
+  const discountedBasePricePaise = effectiveBasePricePaise(menuItem);
+  const unitPricePaise = discountedBasePricePaise + (variant?.priceDeltaPaise ?? 0) + modifierPricePaise;
   const snapshot: OrderItemSnapshot = {
     lineId: lineId(),
     menuItemId: menuItem._id,
     name: menuItem.name,
     quantity: input.quantity,
-    unitBasePricePaise: menuItem.basePricePaise,
+    unitBasePricePaise: discountedBasePricePaise,
     modifiers,
     unitPricePaise,
     lineSubtotalPaise: unitPricePaise * input.quantity,
@@ -127,7 +133,8 @@ export async function priceOrder(
   const menuItemIds = requestedLines.map((line) => line.menuItemId);
   const menuItems = await MenuItemModel.find({
     restaurantId: restaurant._id,
-    _id: { $in: menuItemIds }
+    _id: { $in: menuItemIds },
+    archived: { $ne: true }
   });
   const itemsById = new Map(menuItems.map((menuItem) => [menuItem._id.toString(), menuItem]));
 

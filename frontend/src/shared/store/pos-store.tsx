@@ -10,7 +10,7 @@ import {
 } from "react";
 import { ApiError, api, getAccessToken, setAccessToken } from "@/shared/lib/api";
 import { menuItems as previewMenuItems } from "@/shared/data/demo";
-import { normalizeMenuPayload, normalizeRestaurantPricing } from "@/shared/lib/menu-adapter";
+import { normalizeMenuCategories, normalizeMenuPayload, normalizeRestaurantPricing } from "@/shared/lib/menu-adapter";
 import { normalizeOrders, normalizeTables, normalizeTickets } from "@/shared/lib/operations-adapter";
 import { clearPreviewState, createPreviewChannel, createPreviewOrigin, isNewerPreviewState, previewSeed, readPreviewState, type PreviewRestaurantState, writePreviewState } from "@/shared/lib/preview-state";
 import type {
@@ -21,6 +21,7 @@ import type {
   ItemStatus,
   KitchenTicket,
   MenuItem,
+  MenuCategory,
   Order,
   OrderItem,
   Role,
@@ -32,6 +33,13 @@ import { calculateCartPricing, cartLineLabels, cartLineTotal, cartLineUnitPrice,
 const cartStorageKey = "emberserve.customer-cart:v2";
 const previewCartStorageKey = "emberserve.preview-customer-cart:v1";
 const legacyCartStorageKey = "emberserve.customer-cart";
+
+const categoriesFromMenu = (items: MenuItem[]): MenuCategory[] => Array.from(new Map(items.map((item, index) => [item.category, {
+  id: item.categoryId ?? `preview-category-${index}`,
+  name: item.category,
+  sortOrder: index,
+  visible: true,
+}])).values());
 
 const readStoredCart = (preview = false): CartLine[] => {
   try {
@@ -94,6 +102,7 @@ const readResponseId = (value: unknown): string | undefined => {
 
 interface PosStore {
   menu: MenuItem[];
+  menuCategories: MenuCategory[];
   menuLoading: boolean;
   pricing: RestaurantPricingConfig;
   menuError?: string;
@@ -146,6 +155,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const [cartMode, setCartMode] = useState<DiningMode>("DINE_IN");
   const [cartOpen, setCartOpen] = useState(false);
   const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [pricing, setPricing] = useState<RestaurantPricingConfig>(fallbackRestaurantPricing);
   const [menuError, setMenuError] = useState<string>();
@@ -256,6 +266,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const refreshMenu = useCallback(() => {
     if (demoMode) {
       setMenu(previewMenuItems);
+      setMenuCategories(categoriesFromMenu(previewMenuItems));
       setMenuError(undefined);
       setPricing(fallbackRestaurantPricing);
       setMenuLoading(false);
@@ -263,13 +274,16 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }
     setMenuLoading(true);
     setMenuError(undefined);
-    void api.menu.getPublic(session?.role === "CASHIER" ? undefined : { available: true }).then((payload) => {
+    const loadMenu = session?.role === "CASHIER" ? api.menu.getManaged() : api.menu.getPublic({ available: true });
+    void loadMenu.then((payload) => {
       const nextMenu = normalizeMenuPayload(payload);
       setMenu(nextMenu);
+      setMenuCategories(normalizeMenuCategories(payload));
       setPricing(normalizeRestaurantPricing(payload));
       if (!nextMenu.length) setMenuError("The restaurant has no available menu items right now.");
     }).catch((error: unknown) => {
       setMenu([]);
+      setMenuCategories([]);
       setMenuError(error instanceof ApiError ? error.message : "The live menu is temporarily unavailable.");
     }).finally(() => setMenuLoading(false));
   }, [demoMode, session?.role]);
@@ -767,6 +781,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     setDemoMode(preview);
     if (preview) {
       setMenu(previewMenuItems);
+      setMenuCategories(categoriesFromMenu(previewMenuItems));
       setPricing(fallbackRestaurantPricing);
       setMenuError(undefined);
       setMenuLoading(false);
@@ -788,13 +803,13 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   );
 
   const value = useMemo<PosStore>(() => ({
-    menu, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
+    menu, menuCategories, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
     selectedTableId, toasts, session, authLoading, demoMode, isPending, resetPreview, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
     selectTable, adjustGuests, openTableSession, updateTableSession, closeTableSession, placeOrder, startTicket, markTicketItemReady, markTicketReady, bumpTicket, serveOrder,
     requestBill, settleOrder, notify, login, logout,
   }), [
     addToCart, adjustGuests, bumpTicket, cart, cartMode, cartOpen, cartService, cartSubtotal, cartTax,
-    authLoading, cartTotal, clearCart, demoMode, isPending, login, logout, markTicketItemReady, menu, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill, resetPreview,
+    authLoading, cartTotal, clearCart, demoMode, isPending, login, logout, markTicketItemReady, menu, menuCategories, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill, resetPreview,
     closeTableSession, openTableSession, selectedTableId, serveOrder, session, settleOrder, startTicket, markTicketReady, tables, tickets, toasts, updateLineQuantity, updateTableSession,
   ]);
 

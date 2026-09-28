@@ -15,11 +15,11 @@ const tableTone = (status: string) => `table-card table-card--${status}`;
 export const WaiterPage = () => {
   const {
     tables, orders, cart, cartTotal, addToCart, updateLineQuantity, selectedTableId, selectTable, adjustGuests, openTableSession, updateTableSession, closeTableSession,
-    placeOrder, requestBill, serveOrder, setCartMode, menu, isPending, refreshOperations, notify, session, demoMode,
+    placeOrder, requestBill, serveOrder, setCartMode, menu, isPending, refreshMenu, refreshOperations, notify, session, demoMode,
   } = usePos();
   const [zone, setZone] = useState("All tables");
   const [search, setSearch] = useState("");
-  const live = useLiveUpdates(refreshOperations, !demoMode);
+  const live = useLiveUpdates(() => { refreshOperations(); refreshMenu(); }, !demoMode);
   useEffect(() => setCartMode("DINE_IN"), [setCartMode]);
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? tables[0];
   const selectedOrder = orders.find((order) => order.id === selectedTable?.orderId);
