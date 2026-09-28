@@ -3,11 +3,13 @@ import { BellRing, Check, ChevronRight, ClipboardList, ConciergeBell, CookingPot
 import { Brand } from "@/shared/components/brand";
 import { ConnectionBadge } from "@/shared/components/connection-badge";
 import { FoodVisual } from "@/shared/components/food-visual";
+import { ItemConfigurator, requiresConfiguration } from "@/shared/components/item-configurator";
 import { QuantityControl } from "@/shared/components/quantity-control";
 import { StatusPill } from "@/shared/components/status-pill";
 import { useLiveUpdates } from "@/shared/hooks/useLiveUpdates";
 import { formatMoney } from "@/shared/lib/format";
 import { usePos } from "@/shared/store/pos-store";
+import type { MenuItem } from "@/shared/types/domain";
 
 import { cartLineUnitPrice } from "@/shared/lib/cart";
 const tableTone = (status: string) => `table-card table-card--${status}`;
@@ -25,6 +27,7 @@ export const WaiterPage = () => {
   const selectedOrder = orders.find((order) => order.id === selectedTable?.orderId);
   const [guestDraft, setGuestDraft] = useState(1);
   const [sessionNote, setSessionNote] = useState("");
+  const [configuringItem, setConfiguringItem] = useState<MenuItem>();
   useEffect(() => {
     setGuestDraft(Math.max(1, selectedTable?.guests || 1));
     setSessionNote(selectedTable?.sessionNote ?? "");
@@ -35,6 +38,10 @@ export const WaiterPage = () => {
     const needle = search.trim().toLowerCase();
     return !needle || item.name.toLowerCase().includes(needle) || item.category.toLowerCase().includes(needle);
   }).slice(0, 5), [menu, search]);
+  const addMenuItem = (item: MenuItem) => {
+    if (requiresConfiguration(item)) setConfiguringItem(item);
+    else addToCart(item);
+  };
 
   const focusReadyTable = () => { const readyOrder = readyOrders[0]; const readyTable = readyOrder ? tables.find((table) => table.orderId === readyOrder.id) : undefined; if (readyTable) { selectTable(readyTable.id); notify(`${readyTable.label} is ready to serve.`, "success"); } else { notify("No tables are waiting at the pass.", "info"); } };
   const focusPanel = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -55,10 +62,12 @@ export const WaiterPage = () => {
          {selectedTable.guests > 0 && <div className="table-session-edit"><label>Session note<input value={sessionNote} onChange={(event) => setSessionNote(event.target.value)} placeholder="Optional seating note" maxLength={500} /></label><button type="button" className="outline-button" onClick={() => updateTableSession(selectedTable.id, guestDraft, sessionNote.trim() || undefined)} disabled={isMutating}>Update table</button>{!selectedOrder && !selectedTable.total && <button type="button" className="text-link" onClick={() => closeTableSession(selectedTable.id)} disabled={isMutating}>Close table</button>}</div>}
          <section className="waiter-order-sheet__sent"><div className="sheet-subhead"><span>Sent to kitchen</span>{selectedOrder && <StatusPill status={selectedOrder.status} subtle />}</div>{selectedOrder?.items.length ? selectedOrder.items.map((item) => <article className="sent-line" key={item.id}><span className="sent-line__qty">{item.quantity}×</span><div><strong>{item.name}</strong><small>{item.modifiers?.join(" · ") || item.note || "Kitchen standard"}</small></div><StatusPill status={item.status} subtle /></article>) : <div className="sheet-empty"><CookingPot size={23} /><span>No rounds sent yet.</span></div>}</section>
         <section className="waiter-order-sheet__draft"><div className="sheet-subhead"><span>Unsent round</span>{cart.length > 0 && <b>{cart.length} items</b>}</div>{cart.length ? cart.map((line) => <article className="draft-line" key={line.id}><div><strong>{line.item.name}</strong><small>{formatMoney(cartLineUnitPrice(line))} each</small></div><QuantityControl compact quantity={line.quantity} onChange={(adjustment) => updateLineQuantity(line.id, adjustment)} /></article>) : <div className="sheet-empty"><Send size={23} /><span>Add a dish to start the next round.</span></div>}</section>
-        <section className="waiter-quick-add"><label className="search-field search-field--compact"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Add a dish" /></label><div className="quick-add-list">{menuResults.map((item) => <button type="button" key={item.id} onClick={() => addToCart(item)}><FoodVisual item={item} size="mini" /><span><strong>{item.name}</strong><small>{formatMoney(item.price)}</small></span><Plus size={17} /></button>)}</div></section>
+        <section className="waiter-quick-add"><label className="search-field search-field--compact"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Add a dish" /></label><div className="quick-add-list">{menuResults.map((item) => <button type="button" key={item.id} onClick={() => addMenuItem(item)}><FoodVisual item={item} size="mini" /><span><strong>{item.name}</strong><small>{formatMoney(item.price)}</small></span><Plus size={17} /></button>)}</div></section>
         <footer className="waiter-order-sheet__footer"><div><span>Table total</span><strong>{formatMoney(selectedTable.total + cartTotal)}</strong></div><div className="sheet-actions"><button type="button" className="outline-button" onClick={() => requestBill(selectedTable.id)} disabled={isMutating || !selectedTable.total}>Request bill</button><button type="button" className="button button--saffron" onClick={() => placeOrder("waiter")} disabled={isMutating || !cart.length}><Send size={17} /> {isMutating ? "Saving…" : <>Send {cart.length ? `· ${cart.length}` : ""}</>}</button></div>{selectedOrder?.status === "READY" && <button type="button" className="serve-button" onClick={() => serveOrder(selectedOrder.id)} disabled={isMutating}><Check size={17} /> Mark ready items served</button>}</footer>
+        {selectedOrder?.status === "PARTIALLY_READY" && <button type="button" className="serve-button" onClick={() => serveOrder(selectedOrder.id)} disabled={isMutating}><Check size={17} /> Serve ready items</button>}
       </aside>
     </div>
+    {configuringItem && <ItemConfigurator item={configuringItem} onAdd={(selection) => addToCart(configuringItem, selection)} onClose={() => setConfiguringItem(undefined)} submitLabel="Add to round" />}
     <nav className="waiter-mobile-nav" aria-label="Waiter mobile navigation"><button type="button" className="is-active" aria-current="page" onClick={() => focusPanel("waiter-tables") }><Table2 size={20} /><span>Tables</span></button><button type="button" onClick={() => focusPanel("waiter-orders")}><ClipboardList size={20} /><span>Orders</span></button><button type="button" onClick={focusReadyTable}><ConciergeBell size={20} /><span>Ready</span>{readyOrders.length > 0 && <b>{readyOrders.length}</b>}</button><button type="button" onClick={() => notify(readyOrders.length ? `${readyOrders.length} ready table alerts.` : "No new floor alerts.", "info")}><BellRing size={20} /><span>Alerts</span></button><button type="button" onClick={() => notify(`${staffName} floor-service profile.`, "info")}><ReceiptText size={20} /><span>Profile</span></button></nav>
   </main>;
 };
