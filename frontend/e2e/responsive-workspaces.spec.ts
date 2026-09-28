@@ -39,9 +39,9 @@ test("every preview workspace fits compact phones, tablets, and desktop", async 
     for (const preview of previews) {
       await enterPreview(page, preview.role);
       await expect(page.locator(preview.root)).toBeVisible();
-      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), {
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth), {
         message: preview.role + " should not overflow at " + viewport.name,
-      }).toBe(true);
+      }).toBeLessThanOrEqual(viewport.width);
       await expect(page.locator(".vite-error-overlay")).toHaveCount(0);
       if (viewport.width <= 390 && preview.role === "Guest") await expect(page.locator(".search-field input").first()).toHaveCSS("font-size", "16px");
       if (viewport.width <= 390 && preview.role === "Cashier") await expect(page.locator(".cash-input input")).toHaveCSS("font-size", "16px");
