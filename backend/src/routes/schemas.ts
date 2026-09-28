@@ -66,6 +66,11 @@ const modifierGroupInputSchema = z.object({
   }
 });
 
+const menuOfferInputSchema = z.object({
+  percentage: z.number().int().min(1).max(90),
+  label: z.string().trim().min(1).max(80)
+}).strict();
+
 export const createCategoryRequestSchema = z.object({
   body: z.object({
     name: z.string().trim().min(1).max(100),
@@ -83,8 +88,9 @@ export const createMenuItemRequestSchema = z.object({
     categoryId: objectIdSchema,
     name: z.string().trim().min(1).max(150),
     description: z.string().trim().max(1000).optional(),
-    imageUrl: z.string().url().max(2048).optional(),
+    imageUrl: z.string().url().max(2048),
     basePricePaise: paiseSchema,
+    offer: menuOfferInputSchema.optional(),
     foodType: z.enum(["VEGETARIAN", "NON_VEGETARIAN", "VEGAN"]).default("VEGETARIAN"),
     allergens: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
     spiceLevel: z.number().int().min(0).max(5).default(0),
@@ -99,6 +105,27 @@ export const createMenuItemRequestSchema = z.object({
   query: blank
 });
 
+export const updateMenuItemRequestSchema = z.object({
+  body: z.object({
+    categoryId: objectIdSchema.optional(),
+    name: z.string().trim().min(1).max(150).optional(),
+    description: z.string().trim().max(1000).optional(),
+    imageUrl: z.string().url().max(2048).optional(),
+    basePricePaise: paiseSchema.optional(),
+    offer: menuOfferInputSchema.nullable().optional(),
+    foodType: z.enum(["VEGETARIAN", "NON_VEGETARIAN", "VEGAN"]).optional(),
+    allergens: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+    spiceLevel: z.number().int().min(0).max(5).optional(),
+    available: z.boolean().optional(),
+    featured: z.boolean().optional(),
+    station: z.string().trim().min(1).max(40).optional(),
+    preparationMinutes: z.number().int().min(0).max(240).optional(),
+    variants: z.array(variantInputSchema).max(20).optional(),
+    modifierGroups: z.array(modifierGroupInputSchema).max(15).optional()
+  }).strict().refine((value) => Object.keys(value).length > 0, { message: "At least one menu field is required" }),
+  params: z.object({ id: objectIdSchema }),
+  query: blank
+});
 export const updateMenuAvailabilityRequestSchema = z.object({
   body: z.object({ available: z.boolean() }).strict(),
   params: z.object({ id: objectIdSchema }),

@@ -11,6 +11,7 @@ export const restaurant = {
 export const menuItems: MenuItem[] = [
   {
     id: "smoky-prawn",
+    imageUrl: "https://images.unsplash.com/photo-1756741987051-a6a38f28838b?auto=format&fit=crop&w=1200&q=82",
     name: "Smoky Prawn Skewers",
     description: "Charred prawns, curry leaf butter, pickled mango",
     category: "From the fire",
@@ -26,6 +27,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "tandoori-mushroom",
+    imageUrl: "https://images.pexels.com/photos/36009039/pexels-photo-36009039.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Tandoori Mushroom",
     description: "King oyster mushrooms, burnt garlic, mint chutney",
     category: "From the fire",
@@ -41,6 +43,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "butter-chicken",
+    imageUrl: "https://images.unsplash.com/photo-1768179669433-bd9d52949c20?auto=format&fit=crop&w=1200&q=82",
     name: "Charred Butter Chicken",
     description: "Makhani sauce, smoked fenugreek, charcoal finish",
     category: "Mains",
@@ -56,6 +59,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "millet-khichdi",
+    imageUrl: "https://images.pexels.com/photos/28675074/pexels-photo-28675074.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Saffron Millet Khichdi",
     description: "Pearl millet, seasonal greens, ghee crumble",
     category: "Mains",
@@ -70,6 +74,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "malabar-parotta",
+    imageUrl: "https://images.pexels.com/photos/20446413/pexels-photo-20446413.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Laccha Malabar Parotta",
     description: "Hand-layered, crisp edge, cultured butter",
     category: "Breads & rice",
@@ -84,6 +89,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "rose-lassi",
+    imageUrl: "https://images.pexels.com/photos/17200460/pexels-photo-17200460.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Rose & Pistachio Lassi",
     description: "House-set yogurt, rose petal syrup, pistachio dust",
     category: "Sips",
@@ -99,6 +105,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "kokum-spritz",
+    imageUrl: "https://images.pexels.com/photos/14930476/pexels-photo-14930476.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Sparkling Kokum Spritz",
     description: "Kokum, lime, ginger, soda and sea salt",
     category: "Sips",
@@ -113,6 +120,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "chaat-tacos",
+    imageUrl: "https://images.pexels.com/photos/21078315/pexels-photo-21078315.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Avocado Chaat Tacos",
     description: "Crisp corn shell, avocado, sev, tamarind glaze",
     category: "Small plates",
@@ -127,6 +135,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "paneer-tikka",
+    imageUrl: "https://images.pexels.com/photos/33430556/pexels-photo-33430556.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Saffron Paneer Tikka",
     description: "Paneer, yellow chilli, peppers, cardamom smoke",
     category: "Small plates",
@@ -141,6 +150,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "lamb-rice",
+    imageUrl: "https://images.pexels.com/photos/14731625/pexels-photo-14731625.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Pepper Lamb Rice",
     description: "Slow-cooked lamb, pepper broth, crispy onions",
     category: "Mains",
@@ -155,6 +165,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "coconut-kheer",
+    imageUrl: "https://images.pexels.com/photos/15014919/pexels-photo-15014919.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Coconut Milk Kheer",
     description: "Toasted coconut, jaggery, seasonal fruit",
     category: "Sweet finish",
@@ -169,6 +180,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     id: "chocolate-kulfi",
+    imageUrl: "https://images.pexels.com/photos/7449105/pexels-photo-7449105.jpeg?auto=compress&cs=tinysrgb&w=1200",
     name: "Dark Chocolate Kulfi",
     description: "Single-origin chocolate, salted cashew praline",
     category: "Sweet finish",

@@ -69,11 +69,14 @@ async function seed(): Promise<void> {
   const waiter = accounts[1];
   if (!waiter) throw new Error("Unable to create waiter account");
 
+  const pexels = (id: string) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=1200`;
   const categorySpecs = [
-    { name: "Small Plates", description: "Bright starters for the table.", sortOrder: 1 },
-    { name: "From the Fire", description: "Charcoal-kissed main dishes.", sortOrder: 2 },
-    { name: "Rice & Breads", description: "Comforting accompaniments.", sortOrder: 3 },
-    { name: "Coolers", description: "Freshly mixed drinks.", sortOrder: 4 }
+    { name: "Small Plates", description: "Bright starters for the table.", imageUrl: pexels("21078315"), sortOrder: 1 },
+    { name: "From the Fire", description: "Charcoal-kissed dishes from the tandoor.", imageUrl: pexels("33430556"), sortOrder: 2 },
+    { name: "Mains", description: "Comforting curries and signature bowls.", imageUrl: pexels("36009039"), sortOrder: 3 },
+    { name: "Rice & Breads", description: "Aromatic rice and fresh flatbreads.", imageUrl: pexels("20446413"), sortOrder: 4 },
+    { name: "Coolers", description: "Freshly mixed, zero-proof drinks.", imageUrl: pexels("17200460"), sortOrder: 5 },
+    { name: "Sweet Finish", description: "A small, memorable ending.", imageUrl: pexels("7449105"), sortOrder: 6 }
   ];
   const categories = await Promise.all(categorySpecs.map((spec) => CategoryModel.findOneAndUpdate(
     { restaurantId: restaurant._id, name: spec.name },
@@ -88,37 +91,34 @@ async function seed(): Promise<void> {
   };
 
   const menuSpecs = [
-    {
-      name: "Saffron Paneer Tikka", category: "Small Plates", description: "Charred paneer, kasundi glaze, mint ash.", basePricePaise: 42500,
-      foodType: "VEGETARIAN", station: "TANDOOR", preparationMinutes: 14, featured: true,
-      variants: [], modifierGroups: [{ id: "heat", name: "Heat level", minSelections: 0, maxSelections: 1, options: [{ id: "heat-mild", name: "Mild", priceDeltaPaise: 0, available: true }, { id: "heat-hot", name: "Extra hot", priceDeltaPaise: 0, available: true }] }]
-    },
-    {
-      name: "Smoky Butter Chicken", category: "From the Fire", description: "Charcoal chicken in slow-simmered tomato makhani.", basePricePaise: 52500,
-      foodType: "NON_VEGETARIAN", station: "HOT", preparationMinutes: 18, featured: true,
-      variants: [{ id: "half", name: "Half", priceDeltaPaise: -12000, available: true }, { id: "full", name: "Full", priceDeltaPaise: 0, available: true }], modifierGroups: []
-    },
-    {
-      name: "Ember Dal Makhani", category: "From the Fire", description: "Black lentils, roasted garlic and cultured butter.", basePricePaise: 34500,
-      foodType: "VEGETARIAN", station: "HOT", preparationMinutes: 12, featured: false, variants: [], modifierGroups: []
-    },
-    {
-      name: "Saffron Jeera Rice", category: "Rice & Breads", description: "Aromatic basmati with cumin and saffron.", basePricePaise: 18000,
-      foodType: "VEGETARIAN", station: "HOT", preparationMinutes: 8, featured: false, variants: [], modifierGroups: []
-    },
-    {
-      name: "Tandoor Naan", category: "Rice & Breads", description: "Hand-stretched naan from the clay oven.", basePricePaise: 6500,
-      foodType: "VEGETARIAN", station: "TANDOOR", preparationMinutes: 5, featured: false,
-      variants: [], modifierGroups: [{ id: "naan-style", name: "Finish", minSelections: 0, maxSelections: 1, options: [{ id: "naan-plain", name: "Plain", priceDeltaPaise: 0, available: true }, { id: "naan-garlic", name: "Garlic butter", priceDeltaPaise: 2500, available: true }] }]
-    },
-    {
-      name: "Kokum Sparkler", category: "Coolers", description: "Kokum, lime, black salt and soda.", basePricePaise: 17500,
-      foodType: "VEGAN", station: "BAR", preparationMinutes: 4, featured: true, variants: [], modifierGroups: []
-    }
+    { name: "Saffron Paneer Tikka", category: "Small Plates", description: "Charred paneer, kasundi glaze, mint ash.", imageUrl: pexels("33430556"), basePricePaise: 42500, offer: { percentage: 10, label: "Lunch special" }, foodType: "VEGETARIAN", station: "TANDOOR", preparationMinutes: 14, featured: true, variants: [], modifierGroups: [{ id: "heat", name: "Heat level", minSelections: 0, maxSelections: 1, options: [{ id: "heat-mild", name: "Mild", priceDeltaPaise: 0, available: true }, { id: "heat-hot", name: "Extra hot", priceDeltaPaise: 0, available: true }] }] },
+    { name: "Dahi ke Kebab", category: "Small Plates", description: "Silky hung curd kebabs with coriander and tamarind.", imageUrl: pexels("21078315"), basePricePaise: 29500, foodType: "VEGETARIAN", station: "COLD", preparationMinutes: 9, featured: false, variants: [], modifierGroups: [] },
+    { name: "Amritsari Fish Bites", category: "Small Plates", description: "Crisp coastal fish, ajwain, lime and pickled onion.", imageUrl: "https://images.unsplash.com/photo-1756741987051-a6a38f28838b?auto=format&fit=crop&w=1200&q=82", basePricePaise: 44500, foodType: "NON_VEGETARIAN", station: "HOT", preparationMinutes: 13, featured: true, variants: [], modifierGroups: [] },
+    { name: "Charred Broccoli Chaat", category: "Small Plates", description: "Fire-roasted broccoli, sev, yogurt and tamarind.", imageUrl: pexels("21078315"), basePricePaise: 28500, foodType: "VEGAN", station: "TANDOOR", preparationMinutes: 11, featured: false, variants: [], modifierGroups: [] },
+    { name: "Smoky Butter Chicken", category: "From the Fire", description: "Charcoal chicken in slow-simmered tomato makhani.", imageUrl: "https://images.unsplash.com/photo-1768179669433-bd9d52949c20?auto=format&fit=crop&w=1200&q=82", basePricePaise: 52500, foodType: "NON_VEGETARIAN", station: "HOT", preparationMinutes: 18, featured: true, variants: [{ id: "half", name: "Half", priceDeltaPaise: -12000, available: true }, { id: "full", name: "Full", priceDeltaPaise: 0, available: true }], modifierGroups: [] },
+    { name: "Tandoori Mushroom", category: "From the Fire", description: "King oyster mushrooms, burnt garlic and mint chutney.", imageUrl: pexels("36009039"), basePricePaise: 34500, foodType: "VEGETARIAN", station: "TANDOOR", preparationMinutes: 12, featured: true, variants: [], modifierGroups: [] },
+    { name: "Kasundi Chicken Skewers", category: "From the Fire", description: "Mustard-marinated chicken, peppers and coriander smoke.", imageUrl: "https://images.unsplash.com/photo-1768179669433-bd9d52949c20?auto=format&fit=crop&w=1200&q=82", basePricePaise: 45500, foodType: "NON_VEGETARIAN", station: "TANDOOR", preparationMinutes: 16, featured: false, variants: [], modifierGroups: [] },
+    { name: "Ember Dal Makhani", category: "Mains", description: "Black lentils, roasted garlic and cultured butter.", imageUrl: pexels("28675074"), basePricePaise: 34500, foodType: "VEGETARIAN", station: "HOT", preparationMinutes: 12, featured: false, variants: [], modifierGroups: [] },
+    { name: "Palak Paneer", category: "Mains", description: "Soft paneer in a vibrant spinach and fenugreek gravy.", imageUrl: pexels("36009039"), basePricePaise: 38500, foodType: "VEGETARIAN", station: "HOT", preparationMinutes: 15, featured: false, variants: [], modifierGroups: [] },
+    { name: "Malabar Prawn Curry", category: "Mains", description: "Coconut, kokum and curry leaf prawn curry.", imageUrl: "https://images.unsplash.com/photo-1756741987051-a6a38f28838b?auto=format&fit=crop&w=1200&q=82", basePricePaise: 56500, foodType: "NON_VEGETARIAN", station: "HOT", preparationMinutes: 17, featured: true, variants: [], modifierGroups: [] },
+    { name: "Hyderabadi Chicken Biryani", category: "Mains", description: "Fragrant basmati, tender chicken, mint and fried onion.", imageUrl: pexels("30748997"), basePricePaise: 49500, offer: { percentage: 12, label: "Biryani hour" }, foodType: "NON_VEGETARIAN", station: "HOT", preparationMinutes: 20, featured: true, variants: [], modifierGroups: [] },
+    { name: "Jackfruit Dum Biryani", category: "Mains", description: "Young jackfruit, saffron rice and slow-cooked whole spices.", imageUrl: pexels("32825912"), basePricePaise: 42500, foodType: "VEGAN", station: "HOT", preparationMinutes: 19, featured: false, variants: [], modifierGroups: [] },
+    { name: "Pepper Lamb Rice", category: "Mains", description: "Slow-cooked lamb, pepper broth and crispy onions.", imageUrl: pexels("14731625"), basePricePaise: 59500, foodType: "NON_VEGETARIAN", station: "HOT", preparationMinutes: 22, featured: false, variants: [], modifierGroups: [] },
+    { name: "Saffron Jeera Rice", category: "Rice & Breads", description: "Aromatic basmati with cumin and saffron.", imageUrl: pexels("28674705"), basePricePaise: 18000, foodType: "VEGETARIAN", station: "HOT", preparationMinutes: 8, featured: false, variants: [], modifierGroups: [] },
+    { name: "Tandoor Naan", category: "Rice & Breads", description: "Hand-stretched naan from the clay oven.", imageUrl: pexels("20446413"), basePricePaise: 6500, foodType: "VEGETARIAN", station: "TANDOOR", preparationMinutes: 5, featured: false, variants: [], modifierGroups: [{ id: "naan-style", name: "Finish", minSelections: 0, maxSelections: 1, options: [{ id: "naan-plain", name: "Plain", priceDeltaPaise: 0, available: true }, { id: "naan-garlic", name: "Garlic butter", priceDeltaPaise: 2500, available: true }] }] },
+    { name: "Laccha Paratha", category: "Rice & Breads", description: "Layered whole-wheat paratha with a crisp finish.", imageUrl: pexels("20446423"), basePricePaise: 9500, foodType: "VEGETARIAN", station: "TANDOOR", preparationMinutes: 8, featured: false, variants: [], modifierGroups: [] },
+    { name: "Coconut Lemon Rice", category: "Rice & Breads", description: "Steamed rice, curry leaf, coconut and tempered mustard.", imageUrl: pexels("28674705"), basePricePaise: 19500, foodType: "VEGAN", station: "HOT", preparationMinutes: 9, featured: false, variants: [], modifierGroups: [] },
+    { name: "Kokum Sparkler", category: "Coolers", description: "Kokum, lime, black salt and soda.", imageUrl: pexels("14930476"), basePricePaise: 17500, foodType: "VEGAN", station: "BAR", preparationMinutes: 4, featured: true, variants: [], modifierGroups: [] },
+    { name: "Rose Pistachio Lassi", category: "Coolers", description: "House-set yogurt, rose petal syrup and pistachio dust.", imageUrl: pexels("17200460"), basePricePaise: 19500, foodType: "VEGETARIAN", station: "BAR", preparationMinutes: 4, featured: false, variants: [], modifierGroups: [] },
+    { name: "Mango Saffron Lassi", category: "Coolers", description: "Mango pulp, yogurt and a saffron finish.", imageUrl: pexels("14930476"), basePricePaise: 20500, foodType: "VEGETARIAN", station: "BAR", preparationMinutes: 4, featured: true, variants: [], modifierGroups: [] },
+    { name: "Masala Chaas", category: "Coolers", description: "Spiced buttermilk, mint, cumin and black salt.", imageUrl: pexels("17200460"), basePricePaise: 12500, foodType: "VEGETARIAN", station: "BAR", preparationMinutes: 3, featured: false, variants: [], modifierGroups: [] },
+    { name: "Coconut Milk Kheer", category: "Sweet Finish", description: "Toasted coconut, jaggery and seasonal fruit.", imageUrl: pexels("15014919"), basePricePaise: 24500, foodType: "VEGAN", station: "COLD", preparationMinutes: 5, featured: false, variants: [], modifierGroups: [] },
+    { name: "Dark Chocolate Kulfi", category: "Sweet Finish", description: "Single-origin chocolate and salted cashew praline.", imageUrl: pexels("7449105"), basePricePaise: 26500, foodType: "VEGETARIAN", station: "COLD", preparationMinutes: 4, featured: true, variants: [], modifierGroups: [] },
+    { name: "Gulab Jamun", category: "Sweet Finish", description: "Warm cardamom syrup, rose petal and pistachio.", imageUrl: pexels("11887844"), basePricePaise: 18500, foodType: "VEGETARIAN", station: "COLD", preparationMinutes: 4, featured: false, variants: [], modifierGroups: [] }
   ] as const;
   await Promise.all(menuSpecs.map((spec) => MenuItemModel.findOneAndUpdate(
     { restaurantId: restaurant._id, name: spec.name },
-    { $set: { ...spec, categoryId: categoryId(spec.category), available: true, allergens: [], spiceLevel: 1 } },
+    { $set: { ...spec, categoryId: categoryId(spec.category), available: true, archived: false, allergens: [], spiceLevel: 1 } },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   )));
 
