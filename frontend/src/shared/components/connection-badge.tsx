@@ -1,14 +1,28 @@
 import { CloudOff, Radio } from "lucide-react";
 import { useOnline } from "@/shared/hooks/useClock";
-import { apiIsConfigured } from "@/shared/lib/api";
+import type { LiveConnectionState } from "@/shared/hooks/useLiveUpdates";
 
-export const ConnectionBadge = ({ live = false, dark = false }: { live?: boolean; dark?: boolean }) => {
-  const online = useOnline();
-  const connected = online && live;
+type ConnectionValue = boolean | LiveConnectionState;
+
+const labelFor = (state: LiveConnectionState) => ({
+  unconfigured: "API not configured",
+  preview: "Preview sync",
+  connecting: "Connecting sync",
+  live: "Live sync",
+  reconnecting: "Sync reconnecting",
+  reauthenticating: "Restoring session",
+  offline: "Offline",
+})[state];
+
+export const ConnectionBadge = ({ live = false, dark = false }: { live?: ConnectionValue; dark?: boolean }) => {
+  const browserOnline = useOnline();
+  const state: LiveConnectionState = typeof live === "boolean" ? (live ? "live" : browserOnline ? "reconnecting" : "offline") : live;
+  const connected = browserOnline && (state === "live" || state === "preview");
+  const visibleState = browserOnline ? state : "offline";
   return (
-    <span className={`connection-badge ${dark ? "connection-badge--dark" : ""} ${connected ? "connection-badge--live" : ""}`}>
-      {online ? <Radio size={14} aria-hidden="true" /> : <CloudOff size={14} aria-hidden="true" />}
-      {connected ? "Live sync" : !online ? "Offline" : apiIsConfigured ? "Sync reconnecting" : "API not configured"}
+    <span className={`connection-badge ${dark ? "connection-badge--dark" : ""} ${connected ? "connection-badge--live" : ""}`} aria-live="polite">
+      {visibleState === "offline" ? <CloudOff size={14} aria-hidden="true" /> : <Radio size={14} aria-hidden="true" />}
+      {labelFor(visibleState)}
     </span>
   );
 };
