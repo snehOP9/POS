@@ -17,27 +17,28 @@ const pageNames: Record<string, string> = {
   "/cashier": "Cashier",
   "/waiter": "Waiter service",
   "/kitchen": "Kitchen display",
-  "/login": "Sign in",
+  "/customer/login": "Customer sign in",
+  "/staff/login": "Staff sign in",
 };
 
 const TitleUpdater = () => {
   const location = useLocation();
   useEffect(() => {
-    document.title = `${pageNames[location.pathname] ?? "EmberServe"} · EmberServe POS`;
+    document.title = (pageNames[location.pathname] ?? "EmberServe") + " · EmberServe POS";
   }, [location.pathname]);
   return null;
 };
 
-const NotFound = () => <main className="not-found"><div className="not-found__flame"><Flame size={34} /></div><span className="eyebrow">That order number isn’t on the board</span><h1>We couldn’t find that page.</h1><p>Take a shortcut back to the EmberServe menu.</p><Link className="button button--saffron" to="/menu">Browse menu <ArrowRight size={17} /></Link></main>;
+const NotFound = () => <main className="not-found"><div className="not-found__flame"><Flame size={34} /></div><span className="eyebrow">That order number is not on the board</span><h1>We could not find that page.</h1><p>Take a shortcut back to the EmberServe menu.</p><Link className="button button--saffron" to="/menu">Browse menu <ArrowRight size={17} /></Link></main>;
 
-const RouteLoader = () => <main className="route-loader" aria-live="polite"><span /><span /><span /><strong>Lighting the next station…</strong></main>;
+const RouteLoader = () => <main className="route-loader" aria-live="polite"><span /><span /><span /><strong>Lighting the next station...</strong></main>;
 
 const RoleGuard = ({ role, children }: PropsWithChildren<{ role: Role }>) => {
   const { session, authLoading } = usePos();
   const location = useLocation();
   if (authLoading) return <RouteLoader />;
-  if (!session || session.role !== role) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!session || session.role !== role) return <Navigate to="/staff/login" replace state={{ from: location.pathname }} />;
   return <>{children}</>;
 };
 
-export const App = () => <BrowserRouter><PosProvider><TitleUpdater /><Suspense fallback={<RouteLoader />}><Routes><Route path="/" element={<Navigate to="/menu" replace />} /><Route path="/menu" element={<MenuPage />} /><Route path="/cashier" element={<RoleGuard role="CASHIER"><CashierPage /></RoleGuard>} /><Route path="/waiter" element={<RoleGuard role="WAITER"><WaiterPage /></RoleGuard>} /><Route path="/kitchen" element={<RoleGuard role="KITCHEN"><KitchenPage /></RoleGuard>} /><Route path="/login" element={<LoginPage />} /><Route path="*" element={<NotFound />} /></Routes></Suspense><NotificationCenter /><ToastRail /></PosProvider></BrowserRouter>;
+export const App = () => <BrowserRouter><PosProvider><TitleUpdater /><Suspense fallback={<RouteLoader />}><Routes><Route path="/" element={<Navigate to="/menu" replace />} /><Route path="/menu" element={<MenuPage />} /><Route path="/cashier" element={<RoleGuard role="CASHIER"><CashierPage /></RoleGuard>} /><Route path="/waiter" element={<RoleGuard role="WAITER"><WaiterPage /></RoleGuard>} /><Route path="/kitchen" element={<RoleGuard role="KITCHEN"><KitchenPage /></RoleGuard>} /><Route path="/customer/login" element={<LoginPage audience="customer" />} /><Route path="/staff/login" element={<LoginPage audience="staff" />} /><Route path="/login" element={<Navigate to="/staff/login" replace />} /><Route path="*" element={<NotFound />} /></Routes></Suspense><NotificationCenter /><ToastRail /></PosProvider></BrowserRouter>;

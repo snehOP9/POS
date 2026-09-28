@@ -2,9 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 import axe from "axe-core";
 
 const enterPreview = async (page: Page, role: "Waiter" | "Guest") => {
-  await page.goto("/login");
-  await page.getByRole("radio", { name: role }).click();
-  await page.getByRole("button", { name: `Preview ${role}` }).click();
+  await page.goto(role === "Waiter" ? "/staff/login" : "/customer/login");
+  if (role === "Waiter") await page.getByRole("radio", { name: role }).click();
+  await page.getByRole("button", { name: "Preview " + role }).click();
   await expect(page).toHaveURL(role === "Waiter" ? /\/waiter$/ : /\/menu$/);
 };
 
@@ -33,6 +33,7 @@ test("guest preview supports keyboard menu search and has no serious WCAG violat
   });
   expect(result.violations.filter((violation) => ["critical", "serious"].includes(violation.impact ?? ""))).toEqual([]);
 });
+
 test("guest preview stays within mobile and tablet viewports", async ({ page }) => {
   for (const viewport of [{ width: 390, height: 844 }, { width: 768, height: 1024 }]) {
     await page.setViewportSize(viewport);
@@ -41,6 +42,7 @@ test("guest preview stays within mobile and tablet viewports", async ({ page }) 
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
 });
+
 test("preview guest never contacts a live API or socket", async ({ page }) => {
   const liveRequests: string[] = [];
   page.on("request", (request) => {
