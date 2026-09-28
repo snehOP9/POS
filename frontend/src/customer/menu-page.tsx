@@ -87,7 +87,7 @@ export const MenuPage = () => {
   const [selectedDish, setSelectedDish] = useState<MenuItem>();
   const [pickupName, setPickupName] = useState("");
   const [pickupPhone, setPickupPhone] = useState("");
-  const live = useLiveUpdates(() => { refreshOperations(); refreshMenu(); }, !demoMode);
+  const live = useLiveUpdates(() => { refreshOperations(); refreshMenu(); }, !demoMode && Boolean(session?.accessToken));
   useEffect(() => {
     refreshMenu();
   }, [refreshMenu]);
@@ -127,7 +127,7 @@ export const MenuPage = () => {
   const count = cart.reduce((sum, line) => sum + line.quantity, 0);
 
   return <main className="customer-page">
-    <header className="customer-nav"><Brand /><nav aria-label="Customer navigation"><a href="#menu-list">Menu</a>{latestOrder && <a href="#tracking">Order status</a>}<Link to="/login">Sign in</Link></nav><div className="customer-nav__actions"><ConnectionBadge live={live} /><button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
+    <header className="customer-nav"><Brand /><nav aria-label="Customer navigation"><a href="#menu-list">Menu</a>{latestOrder && <a href="#tracking">Order status</a>}<Link to="/login">Sign in</Link></nav><div className="customer-nav__actions">{(demoMode || session?.accessToken) && <ConnectionBadge live={live} />}<button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
 
     <section className="menu-hero">
       <div className="menu-hero__copy"><span className="eyebrow eyebrow--saffron"><Sparkles size={14} /> A brighter kind of dining</span><h1>Bold flavours,<br /><em>served slow enough</em><br />to remember.</h1><p>Seasonal Indian plates, grilled over flame and brought to your table with care.</p><div className="hero-context"><span><MapPin size={16} /> {restaurant.tableContext}</span><span><Clock3 size={16} /> Kitchen opens until 11:30 PM</span></div><a className="button button--charcoal" href="#menu-list">Explore today’s menu <ChevronRight size={17} /></a></div>
