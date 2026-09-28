@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, type PropsWithChildren } from "react";
 import { ArrowRight, Flame } from "lucide-react";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ToastRail } from "@/shared/components/toast-rail";
+import { NotificationCenter } from "@/shared/components/notification-center";
 import { PosProvider, usePos } from "@/shared/store/pos-store";
 import type { Role } from "@/shared/types/domain";
 
@@ -39,4 +40,4 @@ const RoleGuard = ({ role, children }: PropsWithChildren<{ role: Role }>) => {
   return <>{children}</>;
 };
 
-export const App = () => <BrowserRouter><PosProvider><TitleUpdater /><Suspense fallback={<RouteLoader />}><Routes><Route path="/" element={<Navigate to="/menu" replace />} /><Route path="/menu" element={<MenuPage />} /><Route path="/cashier" element={<RoleGuard role="CASHIER"><CashierPage /></RoleGuard>} /><Route path="/waiter" element={<RoleGuard role="WAITER"><WaiterPage /></RoleGuard>} /><Route path="/kitchen" element={<RoleGuard role="KITCHEN"><KitchenPage /></RoleGuard>} /><Route path="/login" element={<LoginPage />} /><Route path="*" element={<NotFound />} /></Routes></Suspense><ToastRail /></PosProvider></BrowserRouter>;
+export const App = () => <BrowserRouter><PosProvider><TitleUpdater /><Suspense fallback={<RouteLoader />}><Routes><Route path="/" element={<Navigate to="/menu" replace />} /><Route path="/menu" element={<MenuPage />} /><Route path="/cashier" element={<RoleGuard role="CASHIER"><CashierPage /></RoleGuard>} /><Route path="/waiter" element={<RoleGuard role="WAITER"><WaiterPage /></RoleGuard>} /><Route path="/kitchen" element={<RoleGuard role="KITCHEN"><KitchenPage /></RoleGuard>} /><Route path="/login" element={<LoginPage />} /><Route path="*" element={<NotFound />} /></Routes></Suspense><NotificationCenter /><ToastRail /></PosProvider></BrowserRouter>;

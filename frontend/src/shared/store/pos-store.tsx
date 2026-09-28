@@ -9,9 +9,10 @@ import {
   type PropsWithChildren,
 } from "react";
 import { ApiError, api, getAccessToken, setAccessToken } from "@/shared/lib/api";
-import { initialOrders, initialTables, initialTickets, menuItems as previewMenuItems } from "@/shared/data/demo";
+import { menuItems as previewMenuItems } from "@/shared/data/demo";
 import { normalizeMenuPayload, normalizeRestaurantPricing } from "@/shared/lib/menu-adapter";
 import { normalizeOrders, normalizeTables, normalizeTickets } from "@/shared/lib/operations-adapter";
+import { clearPreviewState, createPreviewChannel, createPreviewOrigin, isNewerPreviewState, previewSeed, readPreviewState, type PreviewRestaurantState, writePreviewState } from "@/shared/lib/preview-state";
 import type {
   AuthSession,
   CartLine,
@@ -29,11 +30,13 @@ import type {
 
 import { calculateCartPricing, cartLineLabels, cartLineTotal, cartLineUnitPrice, cartSelectionKey, fallbackRestaurantPricing, type CartSelection } from "@/shared/lib/cart";
 const cartStorageKey = "emberserve.customer-cart:v2";
+const previewCartStorageKey = "emberserve.preview-customer-cart:v1";
 const legacyCartStorageKey = "emberserve.customer-cart";
 
-const readStoredCart = (): CartLine[] => {
+const readStoredCart = (preview = false): CartLine[] => {
   try {
-    const stored = localStorage.getItem(cartStorageKey) ?? localStorage.getItem(legacyCartStorageKey);
+    const stored = localStorage.getItem(preview ? previewCartStorageKey : cartStorageKey)
+      ?? (preview ? null : localStorage.getItem(legacyCartStorageKey));
     if (!stored) return [];
     const parsed: unknown = JSON.parse(stored);
     if (!Array.isArray(parsed)) return [];
@@ -111,7 +114,8 @@ interface PosStore {
   session?: AuthSession;
   authLoading: boolean;
   demoMode: boolean;
-  isMutating: boolean;
+  isPending: (operation: string) => boolean;
+  resetPreview: () => void;
   addToCart: (item: MenuItem, selection?: CartSelection) => void;
   updateLineQuantity: (lineId: string, adjustment: number) => void;
   clearCart: () => void;
@@ -138,7 +142,7 @@ interface PosStore {
 const PosContext = createContext<PosStore | undefined>(undefined);
 
 export const PosProvider = ({ children }: PropsWithChildren) => {
-  const [cart, setCart] = useState<CartLine[]>(readStoredCart);
+  const [cart, setCart] = useState<CartLine[]>(() => readStoredCart());
   const [cartMode, setCartMode] = useState<DiningMode>("DINE_IN");
   const [cartOpen, setCartOpen] = useState(false);
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -153,17 +157,25 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<AuthSession>();
   const [authLoading, setAuthLoading] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
-  const [isMutating, setIsMutating] = useState(false);
+  const [pendingOperations, setPendingOperations] = useState<Set<string>>(() => new Set());
   const restoreAttempt = useRef(0);
+  const pendingOperationRef = useRef(new Set<string>());
+  const previewOrigin = useRef(createPreviewOrigin());
+  const previewStateRef = useRef<PreviewRestaurantState>();
+  const applyingPreviewState = useRef(false);
+  const previewChannelRef = useRef<BroadcastChannel>();
 
   useEffect(() => {
     const attempt = ++restoreAttempt.current;
     const isCurrentAttempt = () => restoreAttempt.current === attempt;
 
     const restoreSession = async () => {
+      const accessToken = getAccessToken();
+      if (!accessToken) {
+        if (isCurrentAttempt()) setAuthLoading(false);
+        return;
+      }
       try {
-        let accessToken = getAccessToken();
-        if (!accessToken) accessToken = (await api.auth.refresh()).accessToken;
         const identity = await api.auth.me();
         if (isCurrentAttempt()) {
           setSession({ role: identity.user.role, name: identity.user.name, accessToken });
@@ -186,11 +198,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
 
   useEffect(() => {
     try {
-      localStorage.setItem(cartStorageKey, JSON.stringify(cart));
-      localStorage.removeItem(legacyCartStorageKey);
+      localStorage.setItem(demoMode ? previewCartStorageKey : cartStorageKey, JSON.stringify(cart));
+      if (!demoMode) localStorage.removeItem(legacyCartStorageKey);
     } catch {
+      // Storage is optional; the cart remains available in memory.
     }
-  }, [cart]);
+  }, [cart, demoMode]);
 
   const notify = useCallback((message: string, tone: ToastMessage["tone"] = "success") => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -199,6 +212,46 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 4_000);
   }, []);
+
+  const startOperation = useCallback((operation: string): boolean => {
+    if (pendingOperationRef.current.has(operation)) {
+      notify("That action is already being saved.", "info");
+      return false;
+    }
+    pendingOperationRef.current.add(operation);
+    setPendingOperations(new Set(pendingOperationRef.current));
+    return true;
+  }, [notify]);
+
+  const finishOperation = useCallback((operation: string) => {
+    pendingOperationRef.current.delete(operation);
+    setPendingOperations(new Set(pendingOperationRef.current));
+  }, []);
+
+  const isPending = useCallback((operation: string) => pendingOperations.has(operation), [pendingOperations]);
+
+  const applyPreviewState = useCallback((next: PreviewRestaurantState) => {
+    applyingPreviewState.current = true;
+    previewStateRef.current = next;
+    setTables(next.tables);
+    setOrders(next.orders);
+    setTickets(next.tickets);
+  }, []);
+
+  const resetPreview = useCallback(() => {
+    const next = previewSeed(previewOrigin.current);
+    clearPreviewState();
+    writePreviewState(next);
+    previewChannelRef.current?.postMessage(next);
+    applyPreviewState(next);
+    setCart([]);
+    try {
+      localStorage.removeItem(previewCartStorageKey);
+    } catch {
+      // Storage is optional; the in-memory reset remains deterministic.
+    }
+    notify("Preview restaurant reset to its seeded state.", "success");
+  }, [applyPreviewState, notify]);
 
   const refreshMenu = useCallback(() => {
     if (demoMode) {
@@ -210,7 +263,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }
     setMenuLoading(true);
     setMenuError(undefined);
-    void api.menu.getPublic({ available: true }).then((payload) => {
+    void api.menu.getPublic(session?.role === "CASHIER" ? undefined : { available: true }).then((payload) => {
       const nextMenu = normalizeMenuPayload(payload);
       setMenu(nextMenu);
       setPricing(normalizeRestaurantPricing(payload));
@@ -219,7 +272,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       setMenu([]);
       setMenuError(error instanceof ApiError ? error.message : "The live menu is temporarily unavailable.");
     }).finally(() => setMenuLoading(false));
-  }, [demoMode]);
+  }, [demoMode, session?.role]);
 
   const refreshOperations = useCallback(() => {
     if (demoMode || !session) return;
@@ -255,20 +308,73 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   }, [refreshOperations]);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!demoMode && !session) {
+      setMenuLoading(false);
+      setMenuError(undefined);
+      return;
+    }
     refreshMenu();
-  }, [refreshMenu]);
+  }, [authLoading, demoMode, refreshMenu, session]);
 
   useEffect(() => {
     if (demoMode) {
-      setTables(initialTables);
-      setOrders(initialOrders);
-      setTickets(initialTickets);
-      return;
+      const channel = createPreviewChannel();
+      previewChannelRef.current = channel;
+      const applyIncoming = (value: unknown) => {
+        if (!value || typeof value !== "object") return;
+        const next = value as PreviewRestaurantState;
+        if (!Array.isArray(next.tables) || !Array.isArray(next.orders) || !Array.isArray(next.tickets)) return;
+        if (isNewerPreviewState(next, previewStateRef.current)) applyPreviewState(next);
+      };
+      const stored = readPreviewState();
+      const initial = stored ?? previewSeed(previewOrigin.current);
+      if (!stored) writePreviewState(initial);
+      applyPreviewState(initial);
+      setCart(readStoredCart(true));
+      if (channel) channel.onmessage = (event: MessageEvent<unknown>) => applyIncoming(event.data);
+      const onStorage = (event: StorageEvent) => {
+        if (event.key !== "emberserve.preview-restaurant:v1" || !event.newValue) return;
+        try {
+          applyIncoming(JSON.parse(event.newValue));
+        } catch {
+          // Invalid external storage is ignored instead of contaminating Preview state.
+        }
+      };
+      window.addEventListener("storage", onStorage);
+      return () => {
+        window.removeEventListener("storage", onStorage);
+        channel?.close();
+        if (previewChannelRef.current === channel) previewChannelRef.current = undefined;
+      };
     }
+    previewStateRef.current = undefined;
+    applyingPreviewState.current = false;
     setTables([]);
     setOrders([]);
     setTickets([]);
-  }, [demoMode]);
+    setCart(readStoredCart());
+    return undefined;
+  }, [applyPreviewState, demoMode]);
+
+  useEffect(() => {
+    if (!demoMode) return;
+    if (applyingPreviewState.current) {
+      applyingPreviewState.current = false;
+      return;
+    }
+    const previous = previewStateRef.current;
+    const next: PreviewRestaurantState = {
+      revision: Math.max(Date.now(), (previous?.revision ?? 0) + 1),
+      origin: previewOrigin.current,
+      tables,
+      orders,
+      tickets,
+    };
+    previewStateRef.current = next;
+    writePreviewState(next);
+    previewChannelRef.current?.postMessage(next);
+  }, [demoMode, orders, tables, tickets]);
 
   const addToCart = useCallback((item: MenuItem, selection: CartSelection = {}) => {
     if (item.unavailable) {
@@ -289,7 +395,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (existing) {
         return current.map((line) => line.id === existing.id ? { ...line, quantity: line.quantity + 1 } : line);
       }
-      return [...current, { id: `${item.id}-${Date.now()}`, item, quantity: 1, variant: selection.variant, modifiers: selection.modifiers ?? [] }];
+      return [...current, { id: `${item.id}-${Date.now()}`, item, quantity: 1, note: selection.note?.trim() || undefined, variant: selection.variant, modifiers: selection.modifiers ?? [] }];
     });
     notify(`${item.name} added to order.`, "info");
   }, [notify]);
@@ -318,11 +424,11 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
         notify("Open the table session before changing its guest count.", "info");
         return;
       }
-      if (isMutating) return;
-      setIsMutating(true);
+      const operation = `table:${tableId}:update`;
+      if (!startOperation(operation)) return;
       void api.waiter.updateTableSession(tableId, { guestCount }).then(() => refreshOperations()).catch((error: unknown) => {
         notify(error instanceof ApiError ? error.message : "Guest count could not be updated.", "danger");
-      }).finally(() => setIsMutating(false));
+      }).finally(() => finishOperation(operation));
       return;
     }
     setTables((current) => current.map((candidate) => candidate.id === tableId ? {
@@ -330,7 +436,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       guests: guestCount,
       status: guestCount ? (candidate.status === "available" ? "seated" : candidate.status) : "available",
     } : candidate));
-  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tables]);
 
   const openTableSession = useCallback((tableId: string, guestCount: number, note?: string) => {
     const table = tables.find((candidate) => candidate.id === tableId);
@@ -344,12 +450,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       notify(`${table.label} opened for ${guestCount} guest${guestCount === 1 ? "" : "s"}.`, "success");
       return;
     }
-    if (isMutating) return;
-    setIsMutating(true);
+    const operation = `table:${tableId}:open`;
+    if (!startOperation(operation)) return;
     void api.waiter.openTable(tableId, { guestCount, note }).then(() => refreshOperations()).then(() => notify(`${table.label} opened for ${guestCount} guest${guestCount === 1 ? "" : "s"}.`, "success")).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "The table could not be opened.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tables]);
 
   const updateTableSession = useCallback((tableId: string, guestCount: number, note?: string) => {
     const table = tables.find((candidate) => candidate.id === tableId);
@@ -363,12 +469,13 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       notify(`${table.label} guest count updated.`, "info");
       return;
     }
-    if (!table.sessionId || isMutating) return;
-    setIsMutating(true);
+    if (!table.sessionId) return;
+    const operation = `table:${tableId}:update`;
+    if (!startOperation(operation)) return;
     void api.waiter.updateTableSession(tableId, { guestCount, note }).then(() => refreshOperations()).then(() => notify(`${table.label} guest count updated.`, "info")).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "The table session could not be updated.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tables]);
 
   const closeTableSession = useCallback((tableId: string) => {
     const table = tables.find((candidate) => candidate.id === tableId);
@@ -378,19 +485,20 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       notify(`${table.label} is available again.`, "success");
       return;
     }
-    if (isMutating) return;
-    setIsMutating(true);
+    const operation = `table:${tableId}:close`;
+    if (!startOperation(operation)) return;
     void api.tables.closeSession(tableId).then(() => refreshOperations()).then(() => notify(`${table.label} session closed.`, "success")).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "The table session could not be closed.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tables]);
 
   const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number, tableToken?: string) => {
     if (!cart.length) {
       notify("Add something delicious before placing an order.", "danger");
       return;
     }
-    if (isMutating) return;
+    const operation = `order:create:${source}`;
+    if (!demoMode && !startOperation(operation)) return;
 
     const table = tables.find((candidate) => candidate.id === selectedTableId);
     const numericId = 1050 + orders.length;
@@ -469,7 +577,6 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       return;
     }
 
-    setIsMutating(true);
     notify(`Creating ${createdOrder.displayId} with the server…`, "info");
     void (source === "waiter" && table
       ? api.waiter.createOrder(table.id, { ...requestPayload, tableId: undefined })
@@ -498,8 +605,8 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }).catch((error: unknown) => {
       const message = error instanceof ApiError ? error.message : "The API is unavailable. Your order has not been created.";
       notify(message, "danger");
-    }).finally(() => setIsMutating(false));
-  }, [cart, cartMode, demoMode, isMutating, notify, orders.length, pricing, refreshOperations, selectedTableId, tables]);
+    }).finally(() => finishOperation(operation));
+  }, [cart, cartMode, demoMode, finishOperation, notify, orders.length, pricing, refreshOperations, selectedTableId, startOperation, tables]);
 
   const startTicket = useCallback((ticketId: string) => {
     const ticket = tickets.find((candidate) => candidate.id === ticketId);
@@ -516,12 +623,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
-    if (isMutating) return;
-    setIsMutating(true);
+    const operation = `ticket:${ticketId}:start`;
+    if (!startOperation(operation)) return;
     void api.kitchen.updateTicket(ticketId, "ACCEPTED").then(() => api.kitchen.updateTicket(ticketId, "PREPARING")).then(apply).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "Kitchen update could not reach the server.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, refreshOperations, tickets]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tickets]);
 
   const markTicketItemReady = useCallback((ticketId: string, itemId: string) => {
     const ticket = tickets.find((candidate) => candidate.id === ticketId);
@@ -544,14 +651,14 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
-    if (isMutating) return;
-    setIsMutating(true);
+    const operation = `ticket:${ticketId}:item:${itemId}:ready`;
+    if (!startOperation(operation)) return;
     const update = api.kitchen.updateItem(ticketId, itemId, "READY");
     const finalUpdate = ticketStatus === "ready" ? update.then(() => api.kitchen.updateTicket(ticketId, "READY")) : update;
     void finalUpdate.then(apply).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "Item status could not be saved.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, refreshOperations, tickets]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tickets]);
 
   const markTicketReady = useCallback((ticketId: string) => {
     const ticket = tickets.find((candidate) => candidate.id === ticketId);
@@ -569,15 +676,15 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
-    if (isMutating) return;
-    setIsMutating(true);
+    const operation = `ticket:${ticketId}:ready`;
+    if (!startOperation(operation)) return;
     void Promise.all(ticket.items.filter((item) => item.status !== "READY").map((item) => api.kitchen.updateItem(ticketId, item.id, "READY")))
       .then(() => api.kitchen.updateTicket(ticketId, "READY"))
       .then(apply)
       .catch((error: unknown) => {
         notify(error instanceof ApiError ? error.message : "Ticket could not be marked ready.", "danger");
-      }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, refreshOperations, tickets]);
+      }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tickets]);
 
   const bumpTicket = useCallback((ticketId: string) => {
     const ticket = tickets.find((candidate) => candidate.id === ticketId);
@@ -588,12 +695,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
-    if (isMutating) return;
-    setIsMutating(true);
+    const operation = `ticket:${ticketId}:bump`;
+    if (!startOperation(operation)) return;
     void api.kitchen.updateTicket(ticketId, "COMPLETED").then(apply).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "Ticket could not be bumped.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, refreshOperations, tickets]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tickets]);
 
   const serveOrder = useCallback((orderId: string) => {
     const order = orders.find((candidate) => candidate.id === orderId);
@@ -609,13 +716,13 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
-    if (isMutating) return;
-    setIsMutating(true);
+    const operation = `order:${orderId}:serve`;
+    if (!startOperation(operation)) return;
     const readyItems = order.items.filter((item) => item.status === "READY");
     void Promise.all(readyItems.map((item) => api.orders.updateItem(orderId, item.id, "SERVED"))).then(() => api.orders.updateStatus(orderId, "SERVED")).then(apply).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "Serve update could not be saved.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, orders, refreshOperations]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, orders, refreshOperations, startOperation]);
 
   const requestBill = useCallback((tableId: string) => {
     const table = tables.find((candidate) => candidate.id === tableId);
@@ -626,16 +733,16 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
-    if (isMutating) return;
     if (!table.orderId) {
       notify("There is no active order to bill for this table.", "danger");
       return;
     }
-    setIsMutating(true);
+    const operation = `table:${tableId}:bill`;
+    if (!startOperation(operation)) return;
     void api.waiter.requestBill(table.orderId).then(apply).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "Bill request could not be sent.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, refreshOperations, tables]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tables]);
 
   const settleOrder = useCallback((orderId: string) => {
     const order = orders.find((candidate) => candidate.id === orderId);
@@ -647,12 +754,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
-    if (isMutating) return;
-    setIsMutating(true);
+    const operation = `payment:${orderId}:cash`;
+    if (!startOperation(operation)) return;
     void api.payments.cash({ orderId, cashReceivedPaise: Math.round(order.total * 100) }).then(() => api.orders.updateStatus(orderId, "COMPLETED")).then(apply).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "Settlement could not be confirmed.", "danger");
-    }).finally(() => setIsMutating(false));
-  }, [demoMode, isMutating, notify, orders, refreshOperations]);
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, orders, refreshOperations, startOperation]);
 
   const login = useCallback((role: Role, name: string, accessToken?: string, preview = false) => {
     restoreAttempt.current += 1;
@@ -682,12 +789,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
 
   const value = useMemo<PosStore>(() => ({
     menu, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
-    selectedTableId, toasts, session, authLoading, demoMode, isMutating, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
+    selectedTableId, toasts, session, authLoading, demoMode, isPending, resetPreview, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
     selectTable, adjustGuests, openTableSession, updateTableSession, closeTableSession, placeOrder, startTicket, markTicketItemReady, markTicketReady, bumpTicket, serveOrder,
     requestBill, settleOrder, notify, login, logout,
   }), [
     addToCart, adjustGuests, bumpTicket, cart, cartMode, cartOpen, cartService, cartSubtotal, cartTax,
-    authLoading, cartTotal, clearCart, demoMode, isMutating, login, logout, markTicketItemReady, menu, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill,
+    authLoading, cartTotal, clearCart, demoMode, isPending, login, logout, markTicketItemReady, menu, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill, resetPreview,
     closeTableSession, openTableSession, selectedTableId, serveOrder, session, settleOrder, startTicket, markTicketReady, tables, tickets, toasts, updateLineQuantity, updateTableSession,
   ]);
 

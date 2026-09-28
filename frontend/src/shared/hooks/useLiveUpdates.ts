@@ -1,52 +1,120 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { apiIsConfigured, apiRoot, getAccessToken } from "@/shared/lib/api";
+import { api, apiIsConfigured, apiRoot, getAccessToken } from "@/shared/lib/api";
 
-export const useLiveUpdates = (onOrderEvent?: () => void) => {
-  const [connected, setConnected] = useState(false);
-  const eventHandler = useRef(onOrderEvent);
+export type LiveConnectionState = "preview" | "unconfigured" | "connecting" | "live" | "reconnecting" | "reauthenticating" | "offline";
+
+const invalidatingEvents = [
+  "order:created",
+  "order:updated",
+  "ticket:updated",
+  "ticket:created",
+  "item:ready",
+  "table:updated",
+  "payment:created",
+  "payment:updated",
+  "notification:created",
+] as const;
+
+export const useLiveUpdates = (onInvalidation?: () => void, enabled = true): LiveConnectionState => {
+  const [state, setState] = useState<LiveConnectionState>(() => !enabled ? "preview" : !apiIsConfigured
+    ? "unconfigured"
+    : navigator.onLine ? "connecting" : "offline");
+  const invalidationHandler = useRef(onInvalidation);
 
   useEffect(() => {
-    eventHandler.current = onOrderEvent;
-  }, [onOrderEvent]);
+    invalidationHandler.current = onInvalidation;
+  }, [onInvalidation]);
 
   useEffect(() => {
-    if (!apiIsConfigured) {
-      setConnected(false);
+    if (!enabled) {
+      setState("preview");
       return;
     }
+    if (!apiIsConfigured) {
+      setState("unconfigured");
+      return;
+    }
+
+    let disposed = false;
+    let refreshInFlight = false;
+    let invalidationTimer: number | undefined;
+    const scheduleInvalidation = () => {
+      if (invalidationTimer) window.clearTimeout(invalidationTimer);
+      invalidationTimer = window.setTimeout(() => invalidationHandler.current?.(), 120);
+    };
     const socketUrl = apiRoot.replace(/\/api\/v1$/, "");
     const socket = io(socketUrl, {
       autoConnect: true,
       auth: getAccessToken() ? { token: getAccessToken() } : undefined,
-      reconnectionAttempts: 3,
-      timeout: 2_500,
+      reconnection: true,
+      reconnectionAttempts: 8,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 4_000,
+      timeout: 5_000,
     });
 
-    const onConnect = () => setConnected(true);
-    const onDisconnect = () => setConnected(false);
-    const onUpdate = () => eventHandler.current?.();
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("order:created", onUpdate);
-    socket.on("order:updated", onUpdate);
-    socket.on("ticket:updated", onUpdate);
-    socket.on("ticket:created", onUpdate);
-    socket.on("item:ready", onUpdate);
-    socket.on("table:updated", onUpdate);
-
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("order:created", onUpdate);
-      socket.off("order:updated", onUpdate);
-      socket.off("ticket:updated", onUpdate);
-      socket.off("ticket:created", onUpdate);
-      socket.off("item:ready", onUpdate);
-      socket.off("table:updated", onUpdate);
+    const refreshSocketToken = () => {
+      if (refreshInFlight || disposed) return;
+      refreshInFlight = true;
+      setState("reauthenticating");
+      void api.auth.refresh().then(({ accessToken }) => {
+        if (disposed) return;
+        socket.auth = { token: accessToken };
+        socket.connect();
+      }).catch(() => {
+        if (!disposed) setState("reconnecting");
+      }).finally(() => {
+        refreshInFlight = false;
+      });
+    };
+    const onConnect = () => {
+      setState("live");
+      scheduleInvalidation();
+    };
+    const onDisconnect = () => setState(navigator.onLine ? "reconnecting" : "offline");
+    const onConnectError = (error: Error) => {
+      const message = error.message.toLowerCase();
+      if (message.includes("token") || message.includes("auth") || message.includes("jwt")) refreshSocketToken();
+      else setState(navigator.onLine ? "reconnecting" : "offline");
+    };
+    const onReconnectAttempt = () => setState(navigator.onLine ? "reconnecting" : "offline");
+    const onReconnect = () => {
+      setState("live");
+      scheduleInvalidation();
+    };
+    const onOnline = () => {
+      setState("connecting");
+      socket.connect();
+    };
+    const onOffline = () => {
+      setState("offline");
       socket.disconnect();
     };
-  }, []);
 
-  return connected;
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
+    socket.io.on("reconnect_attempt", onReconnectAttempt);
+    socket.io.on("reconnect", onReconnect);
+    invalidatingEvents.forEach((event) => socket.on(event, scheduleInvalidation));
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+
+    return () => {
+      disposed = true;
+      if (invalidationTimer) window.clearTimeout(invalidationTimer);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
+      socket.io.off("reconnect_attempt", onReconnectAttempt);
+      socket.io.off("reconnect", onReconnect);
+      invalidatingEvents.forEach((event) => socket.off(event, scheduleInvalidation));
+      socket.disconnect();
+    };
+  }, [enabled]);
+
+  return state;
 };
