@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /menu
+Allow: /privacy
+Allow: /terms
+Disallow: /cashier
+Disallow: /waiter
+Disallow: /kitchen
+Disallow: /staff/login
+Disallow: /customer/login
+Disallow: /login
+Sitemap: https://emberserve-pos.vercel.app/sitemap.xml
