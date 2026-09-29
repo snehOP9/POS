@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import axe from "axe-core";
 
-const enterPreview = async (page: Page, role: "Waiter" | "Guest") => {
-  await page.goto(role === "Waiter" ? "/staff/login" : "/customer/login");
-  if (role === "Waiter") await page.getByRole("radio", { name: role }).click();
+const enterPreview = async (page: Page, role: "Waiter" | "Kitchen" | "Guest") => {
+  const isGuest = role === "Guest";
+  await page.goto(isGuest ? "/customer/login" : "/staff/login");
+  if (!isGuest) await page.getByRole("radio", { name: role }).click();
   await page.getByRole("button", { name: "Preview " + role }).click();
-  await expect(page).toHaveURL(role === "Waiter" ? /\/waiter$/ : /\/menu$/);
+  await expect(page).toHaveURL(isGuest ? /\/menu$/ : role === "Waiter" ? /\/waiter$/ : /\/kitchen$/);
 };
 
 test("preview table updates synchronize across tabs without an API mutation", async ({ page, context }) => {
@@ -41,6 +42,30 @@ test("guest preview stays within mobile and tablet viewports", async ({ page }) 
     await expect(page.locator(".customer-page")).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
+});
+
+test("guest preview orders reach the kitchen and return a ready update on a phone", async ({ page, context }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterPreview(page, "Guest");
+  await page.getByRole("button", { name: "Add" }).first().click();
+  await page.getByRole("button", { name: /view tray/i }).click();
+  await page.getByRole("button", { name: "Send to kitchen" }).click();
+
+  const tracking = page.locator(".tracking-strip");
+  await expect(tracking).toContainText("Confirmed");
+  const displayId = (await tracking.locator("strong").textContent() ?? "").match(/#\d+/)?.[0];
+  expect(displayId).toBeTruthy();
+
+  const kitchen = await context.newPage();
+  await kitchen.setViewportSize({ width: 390, height: 844 });
+  await enterPreview(kitchen, "Kitchen");
+  const ticket = kitchen.locator(".kitchen-ticket", { hasText: displayId! });
+  await expect(ticket).toBeVisible();
+  await ticket.getByRole("button", { name: "Start cooking" }).click();
+  await ticket.getByRole("button", { name: /mark all ready/i }).click();
+  await expect(ticket).toContainText("Ready");
+  await expect(tracking).toContainText("Ready");
+  await expect.poll(() => kitchen.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
 test("preview guest never contacts a live API or socket", async ({ page }) => {
