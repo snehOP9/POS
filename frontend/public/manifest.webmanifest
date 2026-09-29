@@ -1,8 +1,10 @@
 {
+  "id": "/menu",
   "name": "EmberServe POS",
   "short_name": "EmberServe",
-  "description": "A real-time restaurant operating system.",
+  "description": "Restaurant ordering and operational workflow.",
   "start_url": "/menu",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f5f0e6",
   "theme_color": "#23221f",
