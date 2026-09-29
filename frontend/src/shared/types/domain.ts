@@ -33,6 +33,15 @@ export interface RestaurantPricingConfig {
   };
 }
 
+export interface PublicRestaurantInfo {
+  name: string;
+  tagline?: string;
+  description?: string;
+  phone?: string;
+  supportEmail?: string;
+  address?: string;
+}
+
 export interface MenuVariant {
   id: string;
   name: string;

@@ -1,9 +1,12 @@
-const CACHE = "emberserve-shell-v1";
-const APP_SHELL = ["/", "/menu", "/manifest.webmanifest", "/emberserve-mark.svg"];
+const CACHE = "emberserve-shell-v2";
+const APP_SHELL = ["/", "/menu", "/manifest.webmanifest", "/emberserve-mark.svg", "/social-card.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -18,18 +21,22 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).then((response) => {
-      const copy = response.clone();
-      void caches.open(CACHE).then((cache) => cache.put("/menu", copy));
+      if (response.ok) {
+        const copy = response.clone();
+        void caches.open(CACHE).then((cache) => cache.put("/menu", copy));
+      }
       return response;
-    }).catch(() => caches.match("/menu")));
+    }).catch(async () => (await caches.match("/menu")) ?? Response.error()));
     return;
   }
 
   const isStaticAsset = url.pathname.startsWith("/assets/") || /\.(?:css|js|svg|png|webp|woff2?)$/i.test(url.pathname);
   if (!isStaticAsset) return;
   event.respondWith(caches.match(event.request).then((cached) => cached ?? fetch(event.request).then((response) => {
-    const copy = response.clone();
-    void caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+    if (response.ok) {
+      const copy = response.clone();
+      void caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+    }
     return response;
   })));
 });
