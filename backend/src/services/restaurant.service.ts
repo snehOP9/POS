@@ -22,6 +22,7 @@ export function publicRestaurant(restaurant: RestaurantConfig & { _id: Types.Obj
     tagline: restaurant.tagline,
     description: restaurant.description,
     phone: restaurant.phone,
+    supportEmail: restaurant.supportEmail,
     address: restaurant.address,
     currency: restaurant.currency,
     timezone: restaurant.timezone,

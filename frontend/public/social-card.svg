@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">EmberServe POS</title>
+  <desc id="desc">Restaurant ordering and operations.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#29241e"/><stop offset="1" stop-color="#6e311d"/></linearGradient>
+    <radialGradient id="glow" cx=".75" cy=".25" r=".65"><stop stop-color="#f6b04c" stop-opacity=".8"/><stop offset="1" stop-color="#f6b04c" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/><rect width="1200" height="630" fill="url(#glow)"/>
+  <path d="M150 423c-43-65-4-151 56-189-5 49 17 77 42 91 7-83 72-152 147-171 2 81 50 134 82 187 34 57 14 134-44 178-79 61-206 44-283-36Z" fill="#ee8533"/>
+  <path d="M255 427c-23-38-4-86 31-112-1 31 12 48 28 57 4-43 37-79 76-89 2 42 26 69 42 97 18 31 8 72-24 96-42 33-111 24-153-19Z" fill="#fff3d9"/>
+  <text x="510" y="272" fill="#fff8ed" font-family="Georgia,serif" font-size="79" font-weight="700">EmberServe</text>
+  <text x="516" y="345" fill="#ffc176" font-family="Arial,sans-serif" font-size="27" font-weight="700" letter-spacing="7">RESTAURANT POS</text>
+  <text x="516" y="420" fill="#f7ddbf" font-family="Arial,sans-serif" font-size="31">Ordering and operations, in one place.</text>
+</svg>

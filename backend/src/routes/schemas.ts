@@ -155,7 +155,7 @@ export const createOrderRequestSchema = z.object({
     tableSessionId: objectIdSchema.optional(),
     guestCount: z.number().int().min(1).max(50).optional(),
     guestName: z.string().trim().min(1).max(100).optional(),
-    guestPhone: z.string().trim().min(5).max(30).optional(),
+    guestPhone: z.string().trim().regex(/^\+?[0-9][0-9 -]{5,28}[0-9]$/, "Enter a valid phone number").refine((value) => value.replace(/\D/g, "").length >= 7 && value.replace(/\D/g, "").length <= 15, "Enter a phone number with 7 to 15 digits").optional(),
     draft: z.boolean().default(false)
   }).strict(),
   params: blank,
