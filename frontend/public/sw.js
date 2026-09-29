@@ -1,4 +1,4 @@
-const CACHE = "emberserve-shell-v2";
+const CACHE = "emberserve-shell-v3";
 const APP_SHELL = ["/", "/menu", "/manifest.webmanifest", "/emberserve-mark.svg", "/social-card.svg"];
 
 self.addEventListener("install", (event) => {
