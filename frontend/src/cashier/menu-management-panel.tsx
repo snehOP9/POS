@@ -63,7 +63,7 @@ export const MenuManagementPanel = ({
   const [categoryDescription, setCategoryDescription] = useState("");
   const [categoryImageUrl, setCategoryImageUrl] = useState("");
   const [saving, setSaving] = useState(false);
-  const groups = useMemo(() => categories.map((category) => ({ category, items: items.filter((item) => item.categoryId === category.id || item.category === category.name) })), [categories, items]);
+  const groups = useMemo(() => categories.map((category) => ({ category, items: items.filter((item) => item.categoryId === category.id || item.category === category.name).sort((left, right) => left.name.localeCompare(right.name)) })).sort((left, right) => left.category.name.localeCompare(right.category.name)), [categories, items]);
   const firstCategoryId = categories[0]?.id ?? "";
 
   const run = async (work: () => Promise<unknown>, success: string, failure: string) => {
