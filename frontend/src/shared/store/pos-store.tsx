@@ -10,6 +10,7 @@ import {
 } from "react";
 import { ApiError, api, getAccessToken, setAccessToken } from "@/shared/lib/api";
 import { menuItems as previewMenuItems } from "@/shared/data/demo";
+import { formatMoney } from "@/shared/lib/format";
 import { normalizeMenuCategories, normalizeMenuPayload, normalizeRestaurantPricing } from "@/shared/lib/menu-adapter";
 import { normalizeOrders, normalizeTables, normalizeTickets } from "@/shared/lib/operations-adapter";
 import { clearPreviewState, createPreviewChannel, createPreviewOrigin, isNewerPreviewState, previewSeed, readPreviewState, type PreviewRestaurantState, writePreviewState } from "@/shared/lib/preview-state";
@@ -142,7 +143,8 @@ interface PosStore {
   bumpTicket: (ticketId: string) => void;
   serveOrder: (orderId: string) => void;
   requestBill: (tableId: string) => void;
-  settleOrder: (orderId: string) => void;
+  takeCashPayment: (orderId: string, cashReceivedPaise: number) => void;
+  completeOrder: (orderId: string) => void;
   notify: (message: string, tone?: ToastMessage["tone"]) => void;
   login: (role: Role, name: string, accessToken?: string, preview?: boolean) => void;
   logout: () => void;
@@ -611,7 +613,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
           return;
         }
         await api.payments.cash({ orderId: persistedId, cashReceivedPaise });
-        commitOrder({ ...persistedOrder, paymentStatus: "PAID" }, `${persistedOrder.displayId} paid and sent to kitchen.`);
+        commitOrder({ ...persistedOrder, paymentStatus: "PAID" }, `${persistedOrder.displayId} is paid and with the kitchen.`);
       } catch (error) {
         commitOrder({ ...persistedOrder, paymentStatus: "PAYMENT_PENDING" }, `${persistedOrder.displayId} was created, but cash settlement needs attention.`, "danger");
         if (error instanceof ApiError) notify(error.message, "danger");
@@ -719,21 +721,26 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const serveOrder = useCallback((orderId: string) => {
     const order = orders.find((candidate) => candidate.id === orderId);
     if (!order) return;
+    const readyItems = order.items.filter((item) => item.status === "READY");
+    if (!readyItems.length) {
+      notify(order.displayId + " has no ready items to serve.", "info");
+      return;
+    }
+    const allItemsWillBeServed = order.items.every((item) => item.status === "READY" || item.status === "SERVED");
     const apply = () => {
       setOrders((current) => current.map((candidate) => candidate.id === orderId ? {
         ...candidate,
-        status: "SERVED",
-        items: candidate.items.map((item) => ({ ...item, status: "SERVED" as const })),
+        status: allItemsWillBeServed ? "SERVED" : candidate.status,
+        items: candidate.items.map((item) => item.status === "READY" ? { ...item, status: "SERVED" as const } : item),
       } : candidate));
-      setTables((current) => current.map((table) => table.orderId === orderId ? { ...table, status: "bill" } : table));
-      notify(`${order.displayId} marked served.`, "success");
+      if (allItemsWillBeServed) setTables((current) => current.map((table) => table.orderId === orderId ? { ...table, status: "bill" } : table));
+      notify(allItemsWillBeServed ? order.displayId + " marked served." : order.displayId + " ready items marked served.", "success");
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
-    const operation = `order:${orderId}:serve`;
+    const operation = "order:" + orderId + ":serve";
     if (!startOperation(operation)) return;
-    const readyItems = order.items.filter((item) => item.status === "READY");
-    void Promise.all(readyItems.map((item) => api.orders.updateItem(orderId, item.id, "SERVED"))).then(() => api.orders.updateStatus(orderId, "SERVED")).then(apply).catch((error: unknown) => {
+    void Promise.all(readyItems.map((item) => api.orders.updateItem(orderId, item.id, "SERVED"))).then(apply).catch((error: unknown) => {
       notify(error instanceof ApiError ? error.message : "Serve update could not be saved.", "danger");
     }).finally(() => finishOperation(operation));
   }, [demoMode, finishOperation, notify, orders, refreshOperations, startOperation]);
@@ -758,22 +765,62 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }).finally(() => finishOperation(operation));
   }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tables]);
 
-  const settleOrder = useCallback((orderId: string) => {
+  const takeCashPayment = useCallback((orderId: string, cashReceivedPaise: number) => {
     const order = orders.find((candidate) => candidate.id === orderId);
     if (!order) return;
+    if (cashReceivedPaise < Math.round(order.total * 100)) {
+      notify(`Enter at least ${formatMoney(order.total)} to take cash for ${order.displayId}.`, "danger");
+      return;
+    }
     const apply = () => {
-      setOrders((current) => current.map((candidate) => candidate.id === orderId ? { ...candidate, status: "COMPLETED", paymentStatus: "PAID" } : candidate));
-      setTables((current) => current.map((table) => table.orderId === orderId ? { ...table, guests: 0, total: 0, orderId: undefined, status: "available", elapsedMinutes: 0 } : table));
-      notify(`${order.displayId} paid and completed.`, "success");
+      setOrders((current) => current.map((candidate) => candidate.id === orderId ? {
+        ...candidate, paymentStatus: "PAID"
+      } : candidate));
+      notify(`${order.displayId} payment captured. Complete fulfilment when it has been served or collected.`, "success");
       if (!demoMode) refreshOperations();
     };
     if (demoMode) { apply(); return; }
     const operation = `payment:${orderId}:cash`;
     if (!startOperation(operation)) return;
-    void api.payments.cash({ orderId, cashReceivedPaise: Math.round(order.total * 100) }).then(() => api.orders.updateStatus(orderId, "COMPLETED")).then(apply).catch((error: unknown) => {
-      notify(error instanceof ApiError ? error.message : "Settlement could not be confirmed.", "danger");
+    void api.payments.cash({ orderId, cashReceivedPaise }).then(apply).catch((error: unknown) => {
+      notify(error instanceof ApiError ? error.message : "Cash payment could not be confirmed.", "danger");
     }).finally(() => finishOperation(operation));
   }, [demoMode, finishOperation, notify, orders, refreshOperations, startOperation]);
+
+  const completeOrder = useCallback((orderId: string) => {
+    const order = orders.find((candidate) => candidate.id === orderId);
+    if (!order) return;
+    if (order.status !== "SERVED") {
+      notify(`${order.displayId} must be served or collected before completion.`, "danger");
+      return;
+    }
+    if (order.paymentStatus !== "PAID") {
+      notify(`${order.displayId} must be settled before completion.`, "danger");
+      return;
+    }
+    const linkedTable = tables.find((table) => table.orderId === orderId);
+    const apply = (tableReleased = false) => {
+      setOrders((current) => current.map((candidate) => candidate.id === orderId ? { ...candidate, status: "COMPLETED" } : candidate));
+      if (tableReleased) setTables((current) => current.map((table) => table.orderId === orderId ? { ...table, guests: 0, total: 0, orderId: undefined, status: "available", elapsedMinutes: 0 } : table));
+      notify(tableReleased ? `${order.displayId} completed and ${order.tableLabel} is available.` : `${order.displayId} completed.`, "success");
+      if (!demoMode) refreshOperations();
+    };
+    if (demoMode) { apply(Boolean(linkedTable)); return; }
+    const operation = `order:${orderId}:complete`;
+    if (!startOperation(operation)) return;
+    void api.orders.updateStatus(orderId, "COMPLETED").then(async () => {
+      if (!order.tableId) { apply(); return; }
+      try {
+        await api.tables.closeSession(order.tableId);
+        apply(true);
+      } catch (error) {
+        if (error instanceof ApiError && error.code === "TABLE_HAS_UNSETTLED_ORDER") { apply(); return; }
+        throw error;
+      }
+    }).catch((error: unknown) => {
+      notify(error instanceof ApiError ? error.message : "Order completion could not be confirmed.", "danger");
+    }).finally(() => finishOperation(operation));
+  }, [demoMode, finishOperation, notify, orders, refreshOperations, startOperation, tables]);
 
   const login = useCallback((role: Role, name: string, accessToken?: string, preview = false) => {
     restoreAttempt.current += 1;
@@ -806,11 +853,11 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     menu, menuCategories, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
     selectedTableId, toasts, session, authLoading, demoMode, isPending, resetPreview, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
     selectTable, adjustGuests, openTableSession, updateTableSession, closeTableSession, placeOrder, startTicket, markTicketItemReady, markTicketReady, bumpTicket, serveOrder,
-    requestBill, settleOrder, notify, login, logout,
+    requestBill, takeCashPayment, completeOrder, notify, login, logout,
   }), [
     addToCart, adjustGuests, bumpTicket, cart, cartMode, cartOpen, cartService, cartSubtotal, cartTax,
     authLoading, cartTotal, clearCart, demoMode, isPending, login, logout, markTicketItemReady, menu, menuCategories, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill, resetPreview,
-    closeTableSession, openTableSession, selectedTableId, serveOrder, session, settleOrder, startTicket, markTicketReady, tables, tickets, toasts, updateLineQuantity, updateTableSession,
+    closeTableSession, completeOrder, openTableSession, selectedTableId, serveOrder, session, startTicket, takeCashPayment, markTicketReady, tables, tickets, toasts, updateLineQuantity, updateTableSession,
   ]);
 
   return <PosContext.Provider value={value}>{children}</PosContext.Provider>;

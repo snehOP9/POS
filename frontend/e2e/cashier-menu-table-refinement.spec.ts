@@ -25,3 +25,35 @@ test("Cashier table picker shows live occupancy status after selecting a table",
   await expect(page.locator(".table-selector__legend")).toContainText("Occupied");
   await expect(page.locator(".cashier-guest-control")).toBeVisible();
 });
+
+
+test("Cashier can settle, fulfil, and complete a ready preview order", async ({ page }) => {
+  await enterCashierPreview(page);
+  await page.getByRole("button", { name: "Payments", exact: true }).click();
+
+  const paymentCard = page.locator(".operations-order-card").filter({ hasText: "#1044" });
+  await expect(paymentCard).toBeVisible();
+  await paymentCard.getByLabel("Cash received for #1044").fill("1200");
+  await expect(paymentCard).toContainText("Change:");
+  await paymentCard.getByRole("button", { name: "Take cash" }).click();
+  await expect(paymentCard).toHaveCount(0);
+
+  await page.getByRole("button", { name: /^Orders/ }).click();
+  const orderCard = page.locator(".operations-order-card").filter({ hasText: "#1044" });
+  await expect(orderCard.getByRole("button", { name: "Mark ready items served" })).toBeVisible();
+  await orderCard.getByRole("button", { name: "Mark ready items served" }).click();
+  await expect(orderCard.getByRole("button", { name: "Complete order" })).toBeVisible();
+  await orderCard.getByRole("button", { name: "Complete order" }).click();
+  await expect(orderCard).toContainText("Completed");
+});
+
+
+test("Cashier operational cards fit phone and tablet viewports", async ({ page }) => {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 768, height: 1024 }]) {
+    await page.setViewportSize(viewport);
+    await enterCashierPreview(page);
+    await page.getByRole("button", { name: "Payments", exact: true }).click();
+    await expect(page.locator(".operations-order-card").filter({ hasText: "#1044" })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+});
