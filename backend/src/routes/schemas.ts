@@ -23,6 +23,20 @@ export const loginRequestSchema = z.object({
 export const refreshRequestSchema = z.object({ body: optionalBlank, params: blank, query: blank });
 export const logoutRequestSchema = z.object({ body: optionalBlank, params: blank, query: blank });
 
+const customerMobileSchema = z.string().trim().regex(/^\+[1-9][0-9]{7,14}$/, "Enter a valid mobile number with country code");
+
+export const customerOtpRequestSchema = z.object({
+  body: z.object({ phone: customerMobileSchema }).strict(),
+  params: blank,
+  query: blank
+});
+
+export const customerOtpVerifySchema = z.object({
+  body: z.object({ phone: customerMobileSchema, code: z.string().trim().regex(/^[0-9]{6}$/, "Enter the 6-digit code") }).strict(),
+  params: blank,
+  query: blank
+});
+
 export const menuQuerySchema = z.object({
   body: optionalBlank,
   params: blank,

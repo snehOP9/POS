@@ -34,6 +34,11 @@ import { calculateCartPricing, cartLineLabels, cartLineTotal, cartLineUnitPrice,
 const cartStorageKey = "emberserve.customer-cart:v2";
 const previewCartStorageKey = "emberserve.preview-customer-cart:v1";
 const legacyCartStorageKey = "emberserve.customer-cart";
+const developmentGuestPreview = import.meta.env.DEV
+  && typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("preview") === "1";
+const developmentGuestPreviewAuthenticated = developmentGuestPreview
+  && new URLSearchParams(window.location.search).get("guestAuth") !== "0";
 
 const categoriesFromMenu = (items: MenuItem[]): MenuCategory[] => Array.from(new Map(items.map((item, index) => [item.category, {
   id: item.categoryId ?? `preview-category-${index}`,
@@ -166,9 +171,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const [tickets, setTickets] = useState<KitchenTicket[]>([]);
   const [selectedTableId, setSelectedTableId] = useState("t3");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [session, setSession] = useState<AuthSession>();
+  const [session, setSession] = useState<AuthSession | undefined>(() => developmentGuestPreviewAuthenticated
+    ? { role: "CUSTOMER", name: "Preview Guest", preview: true }
+    : undefined
+  );
   const [authLoading, setAuthLoading] = useState(true);
-  const [demoMode, setDemoMode] = useState(false);
+  const [demoMode, setDemoMode] = useState(developmentGuestPreview);
   const [pendingOperations, setPendingOperations] = useState<Set<string>>(() => new Set());
   const restoreAttempt = useRef(0);
   const pendingOperationRef = useRef(new Set<string>());
