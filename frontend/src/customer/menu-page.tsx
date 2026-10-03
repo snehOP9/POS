@@ -40,6 +40,13 @@ const MenuCard = ({ item, onCustomize }: { item: MenuItem; onCustomize: (item: M
   );
 };
 
+const MenuSkeleton = () => <div className="menu-grid menu-grid--skeleton" aria-busy="true" aria-label="Loading menu dishes">
+  {Array.from({ length: 8 }, (_, index) => <article className="menu-card menu-card--skeleton" key={index} aria-hidden="true">
+    <div className="menu-skeleton menu-skeleton--image" />
+    <div className="menu-card__content"><i className="menu-skeleton menu-skeleton--meta" /><i className="menu-skeleton menu-skeleton--title" /><i className="menu-skeleton menu-skeleton--copy" /><i className="menu-skeleton menu-skeleton--action" /></div>
+  </article>)}
+</div>;
+
 const DishDialog = ({ item, onClose }: { item: MenuItem; onClose: () => void }) => {
   const { addToCart } = usePos();
   const dialogRef = useDialogFocus(true, onClose);
@@ -86,10 +93,16 @@ export const MenuPage = () => {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [vegetarian, setVegetarian] = useState(false);
+  const [showSignatures, setShowSignatures] = useState(false);
+  const [spicyOnly, setSpicyOnly] = useState(false);
+  const [menuLimit, setMenuLimit] = useState(12);
   const [selectedDish, setSelectedDish] = useState<MenuItem>();
   const [pickupName, setPickupName] = useState("");
   const [pickupPhone, setPickupPhone] = useState("");
-  const live = useLiveUpdates(() => { refreshOperations(); refreshMenu(); }, !demoMode && Boolean(session?.accessToken));
+  const live = useLiveUpdates((events) => {
+    if (events.has("menu:updated") || events.has("connection:restored")) refreshMenu();
+    if ([...events].some((event) => event !== "menu:updated")) refreshOperations();
+  }, !demoMode && Boolean(session?.accessToken));
   useEffect(() => {
     refreshMenu();
   }, [refreshMenu]);
@@ -107,16 +120,19 @@ export const MenuPage = () => {
     if (!dineInAvailable && cartMode === "DINE_IN") setCartMode("PICKUP");
   }, [cartMode, dineInAvailable, setCartMode]);
 
-  const displayItems = items;
-  const visibleItems = useMemo(() => displayItems.filter((item) => {
+  const visibleItems = useMemo(() => items.filter((item) => {
     const matchesCategory = activeCategory === "All" || item.category === activeCategory;
     const query = search.trim().toLowerCase();
     const matchesSearch = !query || `${item.name} ${item.description} ${item.tags.join(" ")}`.toLowerCase().includes(query);
-    return matchesCategory && matchesSearch && (!vegetarian || item.dietary !== "non-veg");
-  }), [activeCategory, displayItems, search, vegetarian]);
+    return matchesCategory && matchesSearch && (!vegetarian || item.dietary !== "non-veg") && (!showSignatures || item.featured) && (!spicyOnly || Boolean(item.heat));
+  }), [activeCategory, items, search, showSignatures, spicyOnly, vegetarian]);
+  const displayedItems = visibleItems.slice(0, menuLimit);
   const featured = items.filter((item) => item.featured).slice(0, 4);
-  const activeCategories = ["All", ...new Set(items.map((item) => item.category))];
+  const activeCategories = useMemo(() => ["All", ...Array.from(new Set(items.map((item) => item.category))).sort((left, right) => left.localeCompare(right))], [items]);
   const latestOrder = orders.find((order) => isActiveOrder(order.status));
+  useEffect(() => {
+    setMenuLimit(12);
+  }, [activeCategory, search, showSignatures, spicyOnly, vegetarian]);
   useEffect(() => {
     const progress = document.querySelector<HTMLElement>(".order-progress");
     if (!progress || !latestOrder) return;
@@ -138,9 +154,9 @@ export const MenuPage = () => {
 
     {latestOrder && <section className="tracking-strip" id="tracking"><div className="tracking-strip__main"><span className="tracking-orb"><Flame size={20} /></span><div><span className="eyebrow">Your kitchen update</span><strong>{latestOrder.displayId} · {latestOrder.tableLabel}</strong></div></div><StatusPill status={latestOrder.status} /><div className="order-progress" aria-label={`Order ${latestOrder.status.toLowerCase()}`}><span className="is-complete" /><span className={latestOrder.status === "READY" || latestOrder.status === "SERVED" ? "is-complete" : ""} /><span className={latestOrder.status === "SERVED" ? "is-complete" : ""} /></div><button type="button" className="quiet-button" onClick={() => { document.getElementById("tracking")?.scrollIntoView({ behavior: "smooth", block: "center" }); notify(`${latestOrder.displayId} is ${latestOrder.status.toLowerCase().replace("_", " ")}.`, "info"); }}>Track order <ChevronRight size={16} /></button></section>}
 
-    <section className="featured-section"><div className="section-heading"><div><span className="eyebrow">Chef’s spark</span><h2>Worth gathering around</h2></div><button type="button" className="signature-link" onClick={() => { setSearch(""); setActiveCategory("All"); setVegetarian(false); document.getElementById("menu-list")?.scrollIntoView({ behavior: "smooth", block: "start" }); notify("Signature dishes are ready to explore in the menu.", "info"); }}>See all signatures <ChevronRight size={16} /></button></div><div className="featured-rail">{featured.map((item) => <button className={`feature-card feature-card--${item.color}`} type="button" key={item.id} onClick={() => setSelectedDish(item)}><FoodVisual item={item} size="feature" decorative /><span className="feature-card__label">{item.tags[0] ?? "House special"}</span><div><strong>{item.name}</strong><span>{formatMoney(item.price)} · {item.prepMinutes} min</span></div></button>)}</div></section>
+    <section className="featured-section"><div className="section-heading"><div><span className="eyebrow">Chef’s spark</span><h2>Worth gathering around</h2></div><button type="button" className="signature-link" onClick={() => { setSearch(""); setActiveCategory("All"); setVegetarian(false); setSpicyOnly(false); setShowSignatures(true); document.getElementById("menu-list")?.scrollIntoView({ behavior: "smooth", block: "start" }); notify("Showing our signature dishes.", "info"); }}>See all signatures <ChevronRight size={16} /></button></div><div className="featured-rail">{featured.map((item) => <button className={`feature-card feature-card--${item.color}`} type="button" key={item.id} onClick={() => setSelectedDish(item)}><FoodVisual item={item} size="feature" decorative /><span className="feature-card__label">{item.tags[0] ?? "House special"}</span><div><strong>{item.name}</strong><span>{formatMoney(item.price)} · {item.prepMinutes} min</span></div></button>)}</div></section>
 
-    <section className="menu-section" id="menu-list"><div className="section-heading section-heading--menu"><div><span className="section-kicker">Everyday menu</span><div className="menu-heading-row"><h2>Choose your own delicious</h2><span className="menu-source" role="status">{demoMode ? "Preview menu" : menuLoading ? "Loading live menu" : "Live menu"}</span></div></div></div><div className="menu-toolbar"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a dish or ingredient" aria-label="Search menu" /><kbd>⌘ K</kbd></label></div><div className="menu-refinements"><nav className="category-rail" aria-label="Menu categories">{activeCategories.map((category) => <button type="button" key={category} className={activeCategory === category ? "category-chip category-chip--active" : "category-chip"} onClick={() => setActiveCategory(category)}>{category}</button>)}</nav><button type="button" className={vegetarian ? "filter-chip filter-chip--active" : "filter-chip"} aria-pressed={vegetarian} onClick={() => setVegetarian((current) => !current)}><span className="dietary-dot dietary-dot--veg" aria-hidden="true" /> Vegetarian</button></div><div className="menu-grid">{visibleItems.map((item) => <MenuCard key={item.id} item={item} onCustomize={setSelectedDish} />)}</div>{!visibleItems.length && <div className="empty-state menu-empty"><UtensilsCrossed size={34} /><strong>{menuLoading ? "The kitchen is loading today’s menu." : menuError ?? "No plates match that search."}</strong><span>{menuError ? "Check the connection or try again in a moment." : "Try another ingredient or clear a filter."}</span><button type="button" className="menu-reset-button" onClick={() => { if (menuError) refreshMenu(); setSearch(""); setActiveCategory("All"); setVegetarian(false); }}>{menuError ? "Retry menu" : "Reset menu"}</button></div>}</section>
+    <section className="menu-section" id="menu-list"><div className="section-heading section-heading--menu"><div><span className="section-kicker">Everyday menu</span><div className="menu-heading-row"><h2>Choose your own delicious</h2><span className="menu-source" role="status">{demoMode ? "Preview menu" : menuLoading ? "Refreshing live menu" : "Live menu"}</span></div></div></div><div className="menu-toolbar"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a dish or ingredient" aria-label="Search menu" /><kbd>⌘ K</kbd></label><output className="menu-result-count" aria-live="polite">{visibleItems.length} {visibleItems.length === 1 ? "dish" : "dishes"}</output></div><div className="menu-refinements"><nav className="category-rail" aria-label="Menu categories">{activeCategories.map((category) => <button type="button" key={category} className={activeCategory === category ? "category-chip category-chip--active" : "category-chip"} onClick={() => setActiveCategory(category)}>{category}</button>)}</nav><div className="menu-filter-controls"><button type="button" className={vegetarian ? "filter-chip filter-chip--active" : "filter-chip"} aria-pressed={vegetarian} onClick={() => setVegetarian((current) => !current)}><span className="dietary-dot dietary-dot--veg" aria-hidden="true" /> Vegetarian</button><button type="button" className={showSignatures ? "filter-chip filter-chip--active" : "filter-chip"} aria-pressed={showSignatures} onClick={() => setShowSignatures((current) => !current)}><Star size={14} aria-hidden="true" /> Signatures</button><button type="button" className={spicyOnly ? "filter-chip filter-chip--active" : "filter-chip"} aria-pressed={spicyOnly} onClick={() => setSpicyOnly((current) => !current)}><Flame size={14} aria-hidden="true" /> Spicy</button></div></div>{menuLoading && !items.length ? <MenuSkeleton /> : <><div className="menu-grid">{displayedItems.map((item) => <MenuCard key={item.id} item={item} onCustomize={setSelectedDish} />)}</div>{visibleItems.length > displayedItems.length && <button type="button" className="menu-load-more" onClick={() => setMenuLimit((current) => current + 12)}>Show 12 more dishes <ChevronRight size={17} /></button>}</>}{!menuLoading && !visibleItems.length && <div className="empty-state menu-empty"><UtensilsCrossed size={34} /><strong>{menuError ?? "No plates match that search."}</strong><span>{menuError ? "Check the connection or try again in a moment." : "Try another ingredient or clear a filter."}</span><button type="button" className="menu-reset-button" onClick={() => { if (menuError) refreshMenu(); setSearch(""); setActiveCategory("All"); setVegetarian(false); setShowSignatures(false); setSpicyOnly(false); }}>{menuError ? "Retry menu" : "Reset menu"}</button></div>}</section>
 
     <section className="dining-note"><div className="dining-note__star"><Heart fill="currentColor" size={23} /></div><div><span className="eyebrow">A note from our kitchen</span><h2>We cook each order to the moment it’s called.</h2><p>Please let us know about allergies — the team will see your note before the fire starts.</p></div><div className="dining-mode"><span>How are you dining?</span><div>{(["DINE_IN", "PICKUP"] as const).map((mode) => <button key={mode} type="button" className={cartMode === mode ? "mode-pill mode-pill--active" : "mode-pill"} aria-pressed={cartMode === mode} disabled={mode === "DINE_IN" && !dineInAvailable} onClick={() => setCartMode(mode)}>{mode === "DINE_IN" ? "At my table" : "I’ll pick up"}</button>)}</div>{!dineInAvailable && <small>Scan your table QR code to order at your table.</small>}</div></section>
 

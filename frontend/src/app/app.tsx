@@ -34,7 +34,10 @@ const NotFound = () => <main className="not-found">
   </div>
 </main>;
 
-const RouteLoader = () => <main className="route-loader" aria-live="polite"><span /><span /><span /><strong>Loading the next station...</strong></main>;
+const RouteLoader = () => <main className="route-loader" aria-live="polite" aria-label="Loading EmberServe">
+  <div className="route-loader__ember" aria-hidden="true"><i /><i /><i /></div>
+  <div><span>EmberServe</span><strong>Firing up your next station</strong><small>Preparing a calm, fast service flow.</small></div>
+</main>;
 
 const RoleGuard = ({ role, children }: PropsWithChildren<{ role: Role }>) => {
   const { session, authLoading } = usePos();
