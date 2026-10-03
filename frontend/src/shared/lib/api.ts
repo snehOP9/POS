@@ -142,22 +142,16 @@ export interface LoginPayload {
 
 export type LoginResponse = AuthResponse;
 
-export interface CustomerOtpRequestPayload {
-  phone: string;
-}
-
-export interface CustomerOtpVerifyPayload extends CustomerOtpRequestPayload {
-  code: string;
+export interface CustomerFirebaseVerifyPayload {
+  idToken: string;
 }
 
 export const api = {
   auth: {
     login: (payload: LoginPayload) =>
       apiRequest<LoginResponse>("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
-    requestCustomerOtp: (payload: CustomerOtpRequestPayload) =>
-      apiRequest<{ channel: "sms"; expiresInSeconds: number; phoneEnding: string }>("/auth/customer/otp/request", { method: "POST", body: JSON.stringify(payload) }),
-    verifyCustomerOtp: (payload: CustomerOtpVerifyPayload) =>
-      apiRequest<LoginResponse>("/auth/customer/otp/verify", { method: "POST", body: JSON.stringify(payload) }),
+    verifyCustomerFirebase: (payload: CustomerFirebaseVerifyPayload) =>
+      apiRequest<LoginResponse>("/auth/customer/firebase/verify", { method: "POST", body: JSON.stringify(payload) }),
     refresh: refreshAccessToken,
     me: () => apiRequest<CurrentUserResponse>("/auth/me"),
     logout,

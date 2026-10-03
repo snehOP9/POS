@@ -1,58 +1,61 @@
 import { createHash, randomBytes } from "node:crypto";
 
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+
 import { env } from "../config/env.js";
 import { badRequest, serviceUnavailable } from "../lib/errors.js";
 import { logger } from "../config/logger.js";
 
-const twilioVerifyBaseUrl = "https://verify.twilio.com/v2";
+export const customerOtpConfigured = Boolean(env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64);
 
-export const customerOtpConfigured = Boolean(
-  env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID
-);
-
-function twilioAuthorizationHeader(): string {
-  return `Basic ${Buffer.from(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`).toString("base64")}`;
+interface FirebaseServiceAccount {
+  project_id?: string;
+  client_email?: string;
+  private_key?: string;
 }
 
-async function twilioVerify(path: string, payload: URLSearchParams): Promise<Record<string, unknown>> {
-  if (!customerOtpConfigured) {
+function firebaseServiceAccount(): FirebaseServiceAccount {
+  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64) {
     throw serviceUnavailable(
       "OTP_DELIVERY_NOT_CONFIGURED",
       "Mobile verification is not configured for this restaurant yet. Please ask the restaurant to enable SMS delivery."
     );
   }
+  try {
+    const parsed = JSON.parse(Buffer.from(env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, "base64url").toString("utf8")) as FirebaseServiceAccount;
+    if (!parsed.project_id || !parsed.client_email || !parsed.private_key) throw new Error("service account is incomplete");
+    return parsed;
+  } catch (error) {
+    logger.error({ err: error }, "Firebase service account configuration is invalid");
+    throw serviceUnavailable("OTP_DELIVERY_NOT_CONFIGURED", "Mobile verification is not configured for this restaurant yet. Please ask the restaurant to enable SMS delivery.");
+  }
+}
 
-  const response = await fetch(`${twilioVerifyBaseUrl}/Services/${encodeURIComponent(env.TWILIO_VERIFY_SERVICE_SID!)}/${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: twilioAuthorizationHeader(),
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: payload.toString()
+function firebaseAuth() {
+  const account = firebaseServiceAccount();
+  const app = getApps()[0] ?? initializeApp({
+    credential: cert({
+      projectId: account.project_id!,
+      clientEmail: account.client_email!,
+      privateKey: account.private_key!
+    })
   });
-  const body: unknown = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const responseBody = body as { code?: unknown };
-    logger.warn({ statusCode: response.status, twilioCode: responseBody.code }, "Twilio Verify request failed");
-    if (response.status === 400 || response.status === 404) {
-      throw badRequest("OTP_INVALID", "That verification code is invalid or has expired. Request a new code and try again.");
+  return getAuth(app);
+}
+
+export async function verifyCustomerFirebaseIdToken(idToken: string): Promise<string> {
+  try {
+    const decoded = await firebaseAuth().verifyIdToken(idToken, true);
+    const provider = decoded.firebase?.sign_in_provider;
+    if (provider !== "phone" || !decoded.phone_number) {
+      throw badRequest("OTP_INVALID", "Please verify your mobile number again before placing the order.");
     }
-    throw serviceUnavailable("OTP_DELIVERY_FAILED", "We could not deliver a verification code right now. Please try again shortly.");
-  }
-  return typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
-}
-
-export async function requestCustomerOtp(phone: string): Promise<void> {
-  const result = await twilioVerify("Verifications", new URLSearchParams({ To: phone, Channel: "sms" }));
-  if (result.status !== "pending") {
-    throw serviceUnavailable("OTP_DELIVERY_FAILED", "We could not start mobile verification. Please try again shortly.");
-  }
-}
-
-export async function verifyCustomerOtp(phone: string, code: string): Promise<void> {
-  const result = await twilioVerify("VerificationCheck", new URLSearchParams({ To: phone, Code: code }));
-  if (result.status !== "approved") {
-    throw badRequest("OTP_INVALID", "That verification code is invalid or has expired. Request a new code and try again.");
+    return decoded.phone_number;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error as { code?: string }).code === "OTP_INVALID") throw error;
+    logger.warn({ err: error }, "Firebase phone token verification failed");
+    throw badRequest("OTP_INVALID", "That mobile verification has expired or is invalid. Please request a new code and try again.");
   }
 }
 

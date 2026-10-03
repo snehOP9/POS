@@ -9,10 +9,10 @@ import { requireAuth, authContext } from "../middleware/auth.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { AccountModel } from "../models/Account.js";
 import { issueTokens, passwordMatches, publicAccount, verifyToken, hashPassword } from "../services/auth.service.js";
-import { guestAccountEmail, guestAccountPassword, requestCustomerOtp, verifyCustomerOtp } from "../services/customer-otp.service.js";
+import { guestAccountEmail, guestAccountPassword, verifyCustomerFirebaseIdToken } from "../services/customer-otp.service.js";
 import { getSingleRestaurant } from "../services/restaurant.service.js";
 import { disconnectAccountSockets } from "../services/socket.service.js";
-import { customerOtpRequestSchema, customerOtpVerifySchema, loginRequestSchema, logoutRequestSchema, refreshRequestSchema } from "./schemas.js";
+import { customerFirebaseVerifySchema, loginRequestSchema, logoutRequestSchema, refreshRequestSchema } from "./schemas.js";
 
 const refreshCookieName = "emberserve_refresh";
 
@@ -39,14 +39,6 @@ function userPayload(account: Parameters<typeof publicAccount>[0]) {
 
 export const authRouter = Router();
 
-const customerOtpRequestLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: (_request, response) => response.status(429).json({ success: false, error: { code: "OTP_RATE_LIMITED", message: "Too many codes requested. Please wait a few minutes before trying again." } })
-});
-
 const customerOtpVerifyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
@@ -71,15 +63,9 @@ authRouter.post("/login", validateRequest(loginRequestSchema), asyncHandler(asyn
   sendSuccess(response, { accessToken: tokens.accessToken, user: userPayload(account) });
 }));
 
-authRouter.post("/customer/otp/request", customerOtpRequestLimiter, validateRequest(customerOtpRequestSchema), asyncHandler(async (request, response) => {
-  const { phone } = request.body as { phone: string };
-  await requestCustomerOtp(phone);
-  sendSuccess(response, { channel: "sms", expiresInSeconds: 600, phoneEnding: phone.slice(-4) });
-}));
-
-authRouter.post("/customer/otp/verify", customerOtpVerifyLimiter, validateRequest(customerOtpVerifySchema), asyncHandler(async (request, response) => {
-  const { phone, code } = request.body as { phone: string; code: string };
-  await verifyCustomerOtp(phone, code);
+authRouter.post("/customer/firebase/verify", customerOtpVerifyLimiter, validateRequest(customerFirebaseVerifySchema), asyncHandler(async (request, response) => {
+  const { idToken } = request.body as { idToken: string };
+  const phone = await verifyCustomerFirebaseIdToken(idToken);
 
   const restaurant = await getSingleRestaurant();
   let account = await AccountModel.findOne({ restaurantId: restaurant._id, phone }).select("+passwordHash +refreshTokenHash +tokenVersion");
