@@ -5,6 +5,7 @@ import { PERMISSIONS, ROLES, type Permission, type Role } from "../domain/access
 export interface Account {
   restaurantId: Types.ObjectId;
   email: string;
+  phone?: string;
   displayName: string;
   passwordHash: string;
   refreshTokenHash?: string;
@@ -21,6 +22,7 @@ const accountSchema = new Schema<Account>(
   {
     restaurantId: { type: Schema.Types.ObjectId, ref: "RestaurantConfig", required: true, index: true },
     email: { type: String, required: true, trim: true, lowercase: true },
+    phone: { type: String, trim: true },
     displayName: { type: String, required: true, trim: true, maxlength: 100 },
     passwordHash: { type: String, required: true, select: false },
     refreshTokenHash: { type: String, select: false },
@@ -34,6 +36,7 @@ const accountSchema = new Schema<Account>(
 );
 
 accountSchema.index({ restaurantId: 1, email: 1 }, { unique: true });
+accountSchema.index({ restaurantId: 1, phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string" } } });
 accountSchema.index({ restaurantId: 1, role: 1, active: 1 });
 
 export const AccountModel = model<Account>("Account", accountSchema);

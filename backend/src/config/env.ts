@@ -12,6 +12,11 @@ const booleanFromEnvironment = z
   .enum(["true", "false"])
   .transform((value) => value === "true");
 
+const optionalSecret = z.preprocess(
+  (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().trim().min(1).optional()
+);
+
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
@@ -26,11 +31,23 @@ const environmentSchema = z.object({
   RAZORPAY_KEY_ID: z.string().min(1).optional(),
   RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
+  TWILIO_ACCOUNT_SID: optionalSecret,
+  TWILIO_AUTH_TOKEN: optionalSecret,
+  TWILIO_VERIFY_SERVICE_SID: optionalSecret,
   COOKIE_DOMAIN: z.string().trim().min(1).optional(),
   COOKIE_SECURE: booleanFromEnvironment.optional(),
   TRUST_PROXY: booleanFromEnvironment.optional().default("false"),
   ALLOW_PRODUCTION_SEED: booleanFromEnvironment.optional().default("false"),
   SEED_DEMO_PASSWORD: z.string().min(8).max(128).optional()
+}).superRefine((value, context) => {
+  const configuredTwilioValues = [value.TWILIO_ACCOUNT_SID, value.TWILIO_AUTH_TOKEN, value.TWILIO_VERIFY_SERVICE_SID];
+  if (configuredTwilioValues.some(Boolean) && !configuredTwilioValues.every(Boolean)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["TWILIO_ACCOUNT_SID"],
+      message: "TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID must be configured together"
+    });
+  }
 });
 
 const parsedEnvironment = environmentSchema.safeParse(process.env);

@@ -21,3 +21,4 @@ export const forbidden = (code = "AUTH_FORBIDDEN", message = "You are not allowe
 export const notFound = (code: string, message: string) => new AppError(404, code, message);
 export const conflict = (code: string, message: string, details?: Record<string, unknown>) =>
   new AppError(409, code, message, details);
+export const serviceUnavailable = (code: string, message: string) => new AppError(503, code, message);
