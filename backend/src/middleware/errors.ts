@@ -47,7 +47,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
     success: false,
     error: {
       code: normalized.code,
-      message: normalized.statusCode >= 500 && env.NODE_ENV === "production" ? "Internal server error" : normalized.message,
+      message: normalized.statusCode >= 500 && env.NODE_ENV === "production" && !normalized.expose ? "Internal server error" : normalized.message,
       ...(normalized.details ? { details: normalized.details } : {}),
       requestId: request.requestId
     }
