@@ -21,7 +21,10 @@ export const WaiterPage = () => {
   } = usePos();
   const [zone, setZone] = useState("All tables");
   const [search, setSearch] = useState("");
-  const live = useLiveUpdates(() => { refreshOperations(); refreshMenu(); }, !demoMode);
+  const live = useLiveUpdates((events) => {
+    if (events.has("menu:updated") || events.has("connection:restored")) refreshMenu();
+    if ([...events].some((event) => event !== "menu:updated")) refreshOperations();
+  }, !demoMode);
   useEffect(() => setCartMode("DINE_IN"), [setCartMode]);
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? tables[0];
   const selectedOrder = orders.find((order) => order.id === selectedTable?.orderId);

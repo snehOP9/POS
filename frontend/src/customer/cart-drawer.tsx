@@ -19,7 +19,7 @@ interface CartDrawerProps {
 export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout, pickupDetails }: CartDrawerProps) => {
   const {
     cart, cartOpen, setCartOpen, updateLineQuantity, clearCart,
-    cartSubtotal, cartTax, cartService, cartTotal, cartMode, pricing, isPending,
+    cartSubtotal, cartTax, cartService, cartTotal, cartMode, pricing, isPending, session,
   } = usePos();
   const itemCount = cart.reduce((count, line) => count + line.quantity, 0);
   const drawerRef = useDialogFocus(cartOpen, () => setCartOpen(false));
@@ -28,6 +28,7 @@ export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout, pickupDet
   const pickupPhoneInvalid = cartMode === "PICKUP" && (!pickupDetails || pickupPhoneDigits.length < 7 || pickupPhoneDigits.length > 15);
   const pickupIncomplete = pickupNameInvalid || pickupPhoneInvalid;
   const submitting = isPending("order:create:customer");
+  const requiresSignIn = !session || session.role !== "CUSTOMER";
   const pickupHelp = pickupNameInvalid ? "Enter a name with at least 2 characters." : pickupPhoneInvalid ? "Enter a phone number with 7 to 15 digits." : "We use these details only to identify a pickup order.";
 
   if (!cartOpen) return null;
@@ -65,7 +66,8 @@ export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout, pickupDet
             {cartService > 0 && <div><dt>Service</dt><dd>{formatMoney(cartService)}</dd></div>}
             <div className="order-totals__total"><dt>Total</dt><dd>{formatMoney(cartTotal)}</dd></div>
           </dl>
-          <button type="button" className="button button--saffron button--full" onClick={onCheckout} disabled={pickupIncomplete || submitting}><span>{submitting ? "Sending order." : pickupIncomplete ? "Add valid pickup contact" : checkoutLabel}</span><ArrowRight size={18} /></button>
+          {requiresSignIn && <p className="cart-auth-note">Your tray is saved here. Sign in only when you are ready to send the order.</p>}
+          <button type="button" className="button button--saffron button--full" onClick={onCheckout} disabled={pickupIncomplete || submitting}><span>{submitting ? "Sending order." : pickupIncomplete ? "Add valid pickup contact" : requiresSignIn ? "Sign in to continue" : checkoutLabel}</span><ArrowRight size={18} /></button>
         </div>}
       </aside>
     </div>

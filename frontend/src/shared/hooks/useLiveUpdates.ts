@@ -17,7 +17,13 @@ const invalidatingEvents = [
   "menu:updated",
 ] as const;
 
-export const useLiveUpdates = (onInvalidation?: () => void, enabled = true): LiveConnectionState => {
+export type LiveUpdateEvent = (typeof invalidatingEvents)[number] | "connection:restored";
+
+/**
+ * Batches realtime updates without throwing away which resource changed.  A
+ * table update, for example, should not force every screen to reload its menu.
+ */
+export const useLiveUpdates = (onInvalidation?: (events: ReadonlySet<LiveUpdateEvent>) => void, enabled = true): LiveConnectionState => {
   const [state, setState] = useState<LiveConnectionState>(() => !enabled ? "preview" : !apiIsConfigured
     ? "unconfigured"
     : navigator.onLine ? "connecting" : "offline");
@@ -40,9 +46,15 @@ export const useLiveUpdates = (onInvalidation?: () => void, enabled = true): Liv
     let disposed = false;
     let refreshInFlight = false;
     let invalidationTimer: number | undefined;
-    const scheduleInvalidation = () => {
+    const pendingEvents = new Set<LiveUpdateEvent>();
+    const scheduleInvalidation = (event: LiveUpdateEvent) => {
+      pendingEvents.add(event);
       if (invalidationTimer) window.clearTimeout(invalidationTimer);
-      invalidationTimer = window.setTimeout(() => invalidationHandler.current?.(), 120);
+      invalidationTimer = window.setTimeout(() => {
+        const events = new Set(pendingEvents);
+        pendingEvents.clear();
+        invalidationHandler.current?.(events);
+      }, 120);
     };
     const socketUrl = apiRoot.replace(/\/api\/v1$/, "");
     const socket = io(socketUrl, {
@@ -71,7 +83,7 @@ export const useLiveUpdates = (onInvalidation?: () => void, enabled = true): Liv
     };
     const onConnect = () => {
       setState("live");
-      scheduleInvalidation();
+      scheduleInvalidation("connection:restored");
     };
     const onDisconnect = () => setState(navigator.onLine ? "reconnecting" : "offline");
     const onConnectError = (error: Error) => {
@@ -82,7 +94,7 @@ export const useLiveUpdates = (onInvalidation?: () => void, enabled = true): Liv
     const onReconnectAttempt = () => setState(navigator.onLine ? "reconnecting" : "offline");
     const onReconnect = () => {
       setState("live");
-      scheduleInvalidation();
+      scheduleInvalidation("connection:restored");
     };
     const onOnline = () => {
       setState("connecting");
@@ -98,7 +110,7 @@ export const useLiveUpdates = (onInvalidation?: () => void, enabled = true): Liv
     socket.on("connect_error", onConnectError);
     socket.io.on("reconnect_attempt", onReconnectAttempt);
     socket.io.on("reconnect", onReconnect);
-    invalidatingEvents.forEach((event) => socket.on(event, scheduleInvalidation));
+    invalidatingEvents.forEach((event) => socket.on(event, () => scheduleInvalidation(event)));
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
 
@@ -112,7 +124,7 @@ export const useLiveUpdates = (onInvalidation?: () => void, enabled = true): Liv
       socket.off("connect_error", onConnectError);
       socket.io.off("reconnect_attempt", onReconnectAttempt);
       socket.io.off("reconnect", onReconnect);
-      invalidatingEvents.forEach((event) => socket.off(event, scheduleInvalidation));
+      invalidatingEvents.forEach((event) => socket.off(event));
       socket.disconnect();
     };
   }, [enabled]);
