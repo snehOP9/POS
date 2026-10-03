@@ -2,13 +2,15 @@ export class AppError extends Error {
   public readonly statusCode: number;
   public readonly code: string;
   public readonly details?: Record<string, unknown>;
+  public readonly expose: boolean;
 
-  constructor(statusCode: number, code: string, message: string, details?: Record<string, unknown>) {
+  constructor(statusCode: number, code: string, message: string, details?: Record<string, unknown>, expose = false) {
     super(message);
     this.name = "AppError";
     this.statusCode = statusCode;
     this.code = code;
     this.details = details;
+    this.expose = expose;
   }
 }
 
@@ -21,4 +23,4 @@ export const forbidden = (code = "AUTH_FORBIDDEN", message = "You are not allowe
 export const notFound = (code: string, message: string) => new AppError(404, code, message);
 export const conflict = (code: string, message: string, details?: Record<string, unknown>) =>
   new AppError(409, code, message, details);
-export const serviceUnavailable = (code: string, message: string) => new AppError(503, code, message);
+export const serviceUnavailable = (code: string, message: string) => new AppError(503, code, message, undefined, true);
