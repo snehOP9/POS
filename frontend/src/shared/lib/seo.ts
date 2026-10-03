@@ -29,7 +29,7 @@ const internalPages: Record<string, PageMetadata> = {
   "/waiter": { title: "Waiter workspace | EmberServe POS", description: "Protected waiter workspace.", indexable: false },
   "/kitchen": { title: "Kitchen display | EmberServe POS", description: "Protected kitchen display.", indexable: false },
   "/staff/login": { title: "Staff sign in | EmberServe POS", description: "Protected staff sign-in.", indexable: false },
-  "/customer/login": { title: "Customer sign in | EmberServe POS", description: "Customer sign-in.", indexable: false },
+  "/customer/verify": { title: "Confirm mobile | EmberServe POS", description: "Confirm a guest mobile number by SMS before placing an order.", indexable: false },
   "/login": { title: "Sign in | EmberServe POS", description: "Sign-in route.", indexable: false },
 };
 
