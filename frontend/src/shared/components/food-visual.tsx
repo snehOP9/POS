@@ -23,7 +23,9 @@ export const FoodVisual = ({ item, size = "card", decorative = false }: {
   decorative?: boolean;
 }) => {
   const [imageFailed, setImageFailed] = useState(false);
+  const [loadedImageUrl, setLoadedImageUrl] = useState<string>();
   const imageUrl = imageFailed ? undefined : item.imageUrl;
+  const imageLoaded = loadedImageUrl === item.imageUrl;
   const srcSet = useMemo(() => responsiveSrcSet(imageUrl), [imageUrl]);
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export const FoodVisual = ({ item, size = "card", decorative = false }: {
   }, [item.imageUrl]);
 
   return <div
-    className={["food-visual", "food-visual--" + item.color, "food-visual--" + size, imageUrl ? "food-visual--photo" : ""].filter(Boolean).join(" ")}
+    className={["food-visual", "food-visual--" + item.color, "food-visual--" + size, imageUrl ? "food-visual--photo" : "", imageUrl && !imageLoaded ? "food-visual--loading" : "", imageFailed ? "food-visual--fallback" : ""].filter(Boolean).join(" ")}
     role={!decorative && !imageUrl ? "img" : undefined}
     aria-label={!decorative && !imageUrl ? item.name + " dish illustration" : undefined}
     aria-hidden={decorative || undefined}
@@ -43,8 +45,10 @@ export const FoodVisual = ({ item, size = "card", decorative = false }: {
       alt={decorative ? "" : item.name}
       loading="lazy"
       decoding="async"
+      onLoad={() => setLoadedImageUrl(item.imageUrl)}
       onError={() => setImageFailed(true)}
     />}
+    {imageUrl && !imageLoaded && <span className="food-visual__loading" aria-hidden="true" />}
     <span className="food-visual__plate" aria-hidden="true" />
     <span className="food-visual__garnish food-visual__garnish--one" aria-hidden="true" />
     <span className="food-visual__garnish food-visual__garnish--two" aria-hidden="true" />

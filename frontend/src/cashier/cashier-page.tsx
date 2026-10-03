@@ -104,7 +104,10 @@ export const CashierPage = () => {
   const [configuringItem, setConfiguringItem] = useState<MenuItem>();
   const navigate = useNavigate();
   const now = useClock(30_000);
-  const live = useLiveUpdates(() => { refreshOperations(); refreshMenu(); }, !demoMode);
+  const live = useLiveUpdates((events) => {
+    if (events.has("menu:updated") || events.has("connection:restored")) refreshMenu();
+    if ([...events].some((event) => event !== "menu:updated")) refreshOperations();
+  }, !demoMode);
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       if (event.key !== "F2") return;
@@ -222,6 +225,7 @@ export const CashierPage = () => {
       <nav className="cashier-mobile-nav" aria-label="Cashier navigation">
         {navItems.map(([Icon, label]) => <button type="button" key={label} className={activeNav === label ? "cashier-mobile-nav__item cashier-mobile-nav__item--active" : "cashier-mobile-nav__item"} aria-label={label} aria-current={activeNav === label ? "page" : undefined} onClick={() => openCashierSection(label)}><Icon size={16} /><span>{label}</span>{label === "Orders" && activeOrders > 0 && <b>{activeOrders}</b>}</button>)}
       </nav>
+      <button type="button" className="cashier-mobile-bill" onClick={() => document.querySelector(".pos-bill")?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label={`Review live bill, ${cart.length} menu selections, ${formatMoney(cartTotal)}`}><span>Live bill</span><strong>{cart.length ? `${cart.length} item${cart.length === 1 ? "" : "s"}` : "Start bill"}</strong><b>{formatMoney(cartTotal)} · Review</b></button>
       {activeNav === "Menu" && <section className="cashier-operations-panel" aria-live="polite"><header><div><span className="eyebrow">Menu operations</span><h2>Availability by category</h2><p className="availability-summary">{availableMenuItemCount} of {menu.length} dishes are currently available to sell.</p></div><button type="button" className="outline-button" onClick={refreshMenu}>Refresh menu</button></header>
         <label className="availability-search"><Search size={16} /><span className="sr-only">Find a menu item</span><input value={availabilitySearch} onChange={(event) => setAvailabilitySearch(event.target.value)} placeholder="Find a dish" /></label>
         <div className="availability-groups">{availabilityGroups.map(({ category, items }) => <details key={category} className="availability-category" open={Boolean(availabilitySearch)}><summary><span><strong>{category}</strong><small>{items.filter((item) => !item.unavailable).length} of {items.length} available</small></span><b>{items.length}</b><ChevronDown size={16} /></summary><div className="menu-availability-list">{items.map((item) => <article key={item.id}><i className={item.unavailable ? "availability-indicator availability-indicator--unavailable" : "availability-indicator availability-indicator--available"} aria-hidden="true" /><div><strong>{item.name}</strong><small>{item.unavailable ? "Unavailable to guests" : "Available to guests"}</small></div><button type="button" className={item.unavailable ? "outline-button" : "quiet-button quiet-button--danger"} onClick={() => changeAvailability(item)} disabled={menuUpdateId === item.id}>{menuUpdateId === item.id ? "Saving…" : item.unavailable ? "Mark available" : "Mark unavailable"}</button></article>)}</div></details>)}</div>{!availabilityGroups.length && <div className="empty-state"><UtensilsCrossed size={28} /><strong>No dishes match that search.</strong><span>Clear the search to review the full catalogue.</span></div>}
