@@ -15,6 +15,7 @@ import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
 import { orderNumber } from "../lib/ids.js";
 import { serializeKitchenOrder, serializeOrder, serializeWaiterOrder, serializeTicket } from "../lib/serializers.js";
 import { DiningTableModel } from "../models/DiningTable.js";
+import { AccountModel } from "../models/Account.js";
 import { KitchenTicketModel, type KitchenTicketStatus } from "../models/KitchenTicket.js";
 import { OrderModel, type Order } from "../models/Order.js";
 import { TableSessionModel } from "../models/TableSession.js";
@@ -176,8 +177,13 @@ export async function createOrder(actor: ActorContext, input: CreateOrderInput) 
   if (!restaurant.orderingModes.includes(input.mode)) {
     throw badRequest("ORDER_MODE_DISABLED", "This ordering mode is not enabled by the restaurant");
   }
-  if (input.mode === "PICKUP" && actor.role === "CUSTOMER" && (!input.guestName || !input.guestPhone)) {
-    throw badRequest("PICKUP_CONTACT_REQUIRED", "Pickup orders require a customer name and phone number");
+  let verifiedGuestContact: { name: string; phone: string } | undefined;
+  if (input.mode === "PICKUP" && actor.role === "CUSTOMER") {
+    const customer = await AccountModel.findOne({ _id: actor.accountId, restaurantId: actor.restaurantId, active: true }).select("displayName phone");
+    if (!customer?.phone) {
+      throw forbidden("MOBILE_VERIFICATION_REQUIRED", "Confirm your mobile number before placing a pickup order");
+    }
+    verifiedGuestContact = { name: customer.displayName || "Guest", phone: customer.phone };
   }
 
   const source = sourceForRole(actor.role);
@@ -216,8 +222,9 @@ export async function createOrder(actor: ActorContext, input: CreateOrderInput) 
     ...tableContext,
     ...(actor.role === "CUSTOMER" ? { customerId: toObjectId(actor.accountId) } : {}),
     createdByAccountId: toObjectId(actor.accountId),
-    ...(input.guestName ? { guestName: input.guestName } : {}),
-    ...(input.guestPhone ? { guestPhone: input.guestPhone } : {}),
+    ...(verifiedGuestContact ? { guestName: verifiedGuestContact.name, guestPhone: verifiedGuestContact.phone } : {}),
+    ...(!verifiedGuestContact && input.guestName ? { guestName: input.guestName } : {}),
+    ...(!verifiedGuestContact && input.guestPhone ? { guestPhone: input.guestPhone } : {}),
     status,
     paymentStatus: "UNPAID",
     items: quote.items,

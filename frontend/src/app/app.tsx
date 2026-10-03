@@ -13,6 +13,7 @@ const CashierPage = lazy(async () => ({ default: (await import("@/cashier/cashie
 const WaiterPage = lazy(async () => ({ default: (await import("@/waiter/waiter-page")).WaiterPage }));
 const KitchenPage = lazy(async () => ({ default: (await import("@/kitchen/kitchen-page")).KitchenPage }));
 const LoginPage = lazy(async () => ({ default: (await import("@/auth/login-page")).LoginPage }));
+const CustomerVerificationPage = lazy(async () => ({ default: (await import("@/auth/customer-verification-page")).CustomerVerificationPage }));
 const LegalPage = lazy(async () => ({ default: (await import("@/public/public-pages")).LegalPage }));
 
 const TitleUpdater = () => {
@@ -59,7 +60,8 @@ export const App = () => <BrowserRouter>
         <Route path="/cashier" element={<RoleGuard role="CASHIER"><CashierPage /></RoleGuard>} />
         <Route path="/waiter" element={<RoleGuard role="WAITER"><WaiterPage /></RoleGuard>} />
         <Route path="/kitchen" element={<RoleGuard role="KITCHEN"><KitchenPage /></RoleGuard>} />
-        <Route path="/customer/login" element={<LoginPage audience="customer" />} />
+        <Route path="/customer/verify" element={<CustomerVerificationPage />} />
+        <Route path="/customer/login" element={<Navigate to="/menu" replace />} />
         <Route path="/staff/login" element={<LoginPage audience="staff" />} />
         <Route path="/login" element={<Navigate to="/staff/login" replace />} />
         <Route path="*" element={<NotFound />} />

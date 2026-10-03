@@ -22,8 +22,7 @@ const viewports = [
 
 const enterPreview = async (page: Page, role: Preview["role"]) => {
   if (role === "Guest") {
-    await page.goto("/customer/login");
-    await page.getByRole("button", { name: "Preview Guest" }).click();
+    await page.goto("/menu?preview=1");
     return;
   }
   await page.goto("/staff/login");

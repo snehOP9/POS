@@ -3,10 +3,15 @@ import axe from "axe-core";
 
 const enterPreview = async (page: Page, role: "Waiter" | "Kitchen" | "Guest") => {
   const isGuest = role === "Guest";
-  await page.goto(isGuest ? "/customer/login" : "/staff/login");
+  if (isGuest) {
+    await page.goto("/menu?preview=1");
+    await expect(page).toHaveURL(/\/menu\?preview=1$/);
+    return;
+  }
+  await page.goto("/staff/login");
   if (!isGuest) await page.getByRole("radio", { name: role }).click();
   await page.getByRole("button", { name: "Preview " + role }).click();
-  await expect(page).toHaveURL(isGuest ? /\/menu$/ : role === "Waiter" ? /\/waiter$/ : /\/kitchen$/);
+  await expect(page).toHaveURL(role === "Waiter" ? /\/waiter$/ : /\/kitchen$/);
 };
 
 test("preview table updates synchronize across tabs without an API mutation", async ({ page, context }) => {
