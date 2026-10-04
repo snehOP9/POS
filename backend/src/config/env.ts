@@ -31,7 +31,7 @@ const environmentSchema = z.object({
   RAZORPAY_KEY_ID: z.string().min(1).optional(),
   RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
-  FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: optionalSecret,
+  FIREBASE_PROJECT_ID: optionalSecret,
   COOKIE_DOMAIN: z.string().trim().min(1).optional(),
   COOKIE_SECURE: booleanFromEnvironment.optional(),
   TRUST_PROXY: booleanFromEnvironment.optional().default("false"),
