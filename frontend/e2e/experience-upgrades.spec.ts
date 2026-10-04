@@ -27,16 +27,11 @@ test("guest signatures filter to signature dishes and preserves a compact first 
 
 test("guest mobile OTP verification resumes the saved order without a password screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  let requestedPhone = "";
-  let verifiedPhone = "";
+  let firebaseToken = "";
   let createdOrder = false;
-  await page.route("**/api/v1/auth/customer/otp/request", async (route) => {
-    requestedPhone = JSON.parse(route.request().postData() ?? "{}").phone;
-    await route.fulfill({ json: { success: true, data: { channel: "sms", expiresInSeconds: 600, phoneEnding: "3210" } } });
-  });
-  await page.route("**/api/v1/auth/customer/otp/verify", async (route) => {
+  await page.route("**/api/v1/auth/customer/firebase/verify", async (route) => {
     const body = JSON.parse(route.request().postData() ?? "{}");
-    verifiedPhone = body.phone;
+    firebaseToken = body.idToken;
     await route.fulfill({ json: { success: true, data: { accessToken: "test-customer-token", user: { name: "Guest", role: "CUSTOMER" } } } });
   });
   await page.route("**/api/v1/orders**", async (route) => {
@@ -47,7 +42,7 @@ test("guest mobile OTP verification resumes the saved order without a password s
     createdOrder = true;
     await route.fulfill({ json: { success: true, data: { id: "otp-order", orderNumber: "EG-1001", mode: "PICKUP", status: "PLACED", paymentStatus: "UNPAID", items: [], pricing: { grandTotalPaise: 10000 } } } });
   });
-  await page.goto("/menu?preview=1&guestAuth=0");
+  await page.goto("/menu?preview=1&guestAuth=0&firebaseTest=1");
   await expect(page.locator(".customer-page")).toBeVisible();
   await page.locator(".menu-grid .add-button").first().click();
   await page.getByRole("button", { name: /Open cart/i }).click();
@@ -60,8 +55,7 @@ test("guest mobile OTP verification resumes the saved order without a password s
   await page.getByLabel("6-digit OTP").fill("123456");
   await page.getByRole("button", { name: /Confirm OTP & place order/i }).click();
   await expect.poll(() => createdOrder).toBe(true);
-  expect(requestedPhone).toBe("+919876543210");
-  expect(verifiedPhone).toBe("+919876543210");
+  expect(firebaseToken).toBe("firebase-test-phone:+919876543210");
 });
 
 test("cashier phone keeps the live bill one tap away without horizontal overflow", async ({ page }) => {

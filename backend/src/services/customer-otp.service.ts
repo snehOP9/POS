@@ -1,58 +1,51 @@
 import { createHash, randomBytes } from "node:crypto";
 
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+
 import { env } from "../config/env.js";
-import { badRequest, serviceUnavailable } from "../lib/errors.js";
+import { AppError, badRequest, serviceUnavailable } from "../lib/errors.js";
 import { logger } from "../config/logger.js";
 
-const twilioVerifyBaseUrl = "https://verify.twilio.com/v2";
-
-export const customerOtpConfigured = Boolean(
-  env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID
+const firebaseSigningKeys = createRemoteJWKSet(
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
 );
+const maximumPhoneAuthenticationAgeSeconds = 10 * 60;
 
-function twilioAuthorizationHeader(): string {
-  return `Basic ${Buffer.from(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`).toString("base64")}`;
+export const customerOtpConfigured = Boolean(env.FIREBASE_PROJECT_ID);
+
+export function phoneFromVerifiedFirebaseToken(payload: JWTPayload, currentTimeSeconds = Math.floor(Date.now() / 1000)): string {
+  const provider = (payload.firebase as { sign_in_provider?: unknown } | undefined)?.sign_in_provider;
+  const phone = payload.phone_number;
+  const authenticationTime = payload.auth_time;
+  const authenticationIsFresh = typeof authenticationTime === "number"
+    && Number.isSafeInteger(authenticationTime)
+    && authenticationTime <= currentTimeSeconds + 60
+    && currentTimeSeconds - authenticationTime <= maximumPhoneAuthenticationAgeSeconds;
+
+  if (provider !== "phone" || typeof phone !== "string" || !/^\+[1-9][0-9]{7,14}$/.test(phone) || !authenticationIsFresh) {
+    throw badRequest("OTP_INVALID", "Please verify your mobile number again before placing the order.");
+  }
+  return phone;
 }
 
-async function twilioVerify(path: string, payload: URLSearchParams): Promise<Record<string, unknown>> {
-  if (!customerOtpConfigured) {
+export async function verifyCustomerFirebaseIdToken(idToken: string): Promise<string> {
+  if (!env.FIREBASE_PROJECT_ID) {
     throw serviceUnavailable(
       "OTP_DELIVERY_NOT_CONFIGURED",
       "Mobile verification is not configured for this restaurant yet. Please ask the restaurant to enable SMS delivery."
     );
   }
-
-  const response = await fetch(`${twilioVerifyBaseUrl}/Services/${encodeURIComponent(env.TWILIO_VERIFY_SERVICE_SID!)}/${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: twilioAuthorizationHeader(),
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: payload.toString()
-  });
-  const body: unknown = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const responseBody = body as { code?: unknown };
-    logger.warn({ statusCode: response.status, twilioCode: responseBody.code }, "Twilio Verify request failed");
-    if (response.status === 400 || response.status === 404) {
-      throw badRequest("OTP_INVALID", "That verification code is invalid or has expired. Request a new code and try again.");
-    }
-    throw serviceUnavailable("OTP_DELIVERY_FAILED", "We could not deliver a verification code right now. Please try again shortly.");
-  }
-  return typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
-}
-
-export async function requestCustomerOtp(phone: string): Promise<void> {
-  const result = await twilioVerify("Verifications", new URLSearchParams({ To: phone, Channel: "sms" }));
-  if (result.status !== "pending") {
-    throw serviceUnavailable("OTP_DELIVERY_FAILED", "We could not start mobile verification. Please try again shortly.");
-  }
-}
-
-export async function verifyCustomerOtp(phone: string, code: string): Promise<void> {
-  const result = await twilioVerify("VerificationCheck", new URLSearchParams({ To: phone, Code: code }));
-  if (result.status !== "approved") {
-    throw badRequest("OTP_INVALID", "That verification code is invalid or has expired. Request a new code and try again.");
+  try {
+    const { payload } = await jwtVerify(idToken, firebaseSigningKeys, {
+      algorithms: ["RS256"],
+      audience: env.FIREBASE_PROJECT_ID,
+      issuer: `https://securetoken.google.com/${env.FIREBASE_PROJECT_ID}`
+    });
+    return phoneFromVerifiedFirebaseToken(payload);
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    logger.warn({ err: error }, "Firebase phone token verification failed");
+    throw badRequest("OTP_INVALID", "That mobile verification has expired or is invalid. Please request a new code and try again.");
   }
 }
 

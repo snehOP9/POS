@@ -169,7 +169,21 @@ export const MenuPage = () => {
     <section className="dining-note"><div className="dining-note__star"><Heart fill="currentColor" size={23} /></div><div><span className="eyebrow">A note from our kitchen</span><h2>We cook each order to the moment it’s called.</h2><p>Please let us know about allergies — the team will see your note before the fire starts.</p></div><div className="dining-mode"><span>How are you dining?</span><div>{(["DINE_IN", "PICKUP"] as const).map((mode) => <button key={mode} type="button" className={cartMode === mode ? "mode-pill mode-pill--active" : "mode-pill"} aria-pressed={cartMode === mode} disabled={mode === "DINE_IN" && !dineInAvailable} onClick={() => setCartMode(mode)}>{mode === "DINE_IN" ? "At my table" : "I’ll pick up"}</button>)}</div>{!dineInAvailable && <small>Scan your table QR code to order at your table.</small>}</div></section>
 
     {count > 0 && <button className="mobile-cart-bar" type="button" onClick={() => setCartOpen(true)}><ShoppingBag size={19} /><span>{count} {count === 1 ? "item" : "items"}</span><strong>View tray</strong></button>}
-    <CartDrawer checkoutLabel={cartMode === "DINE_IN" ? "Send to kitchen" : "Place pickup order"} onCheckout={() => { if (!session || session.role !== "CUSTOMER") { navigate("/customer/verify", { state: { from: `${location.pathname}${location.search}${location.hash}` } }); return; } placeOrder("customer", "UNPAID", undefined, undefined, undefined, tableToken); }} />
+    <CartDrawer
+      checkoutLabel={cartMode === "DINE_IN" ? "Send to kitchen" : "Place pickup order"}
+      onCheckout={() => {
+        if (!session || session.role !== "CUSTOMER") {
+          const firebaseTestSearch = import.meta.env.DEV && new URLSearchParams(location.search).get("firebaseTest") === "1"
+            ? "?firebaseTest=1"
+            : "";
+          navigate(`/customer/verify${firebaseTestSearch}`, {
+            state: { from: `${location.pathname}${location.search}${location.hash}` },
+          });
+          return;
+        }
+        placeOrder("customer", "UNPAID", undefined, undefined, undefined, tableToken);
+      }}
+    />
     {selectedDish && <DishDialog item={selectedDish} onClose={() => setSelectedDish(undefined)} />}
   </main><PublicFooter /></>;
 };

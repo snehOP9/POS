@@ -12,7 +12,7 @@
     "seed": "tsx src/scripts/seed.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src --max-warnings=0",
-    "test": "tsx --test src/domain/orderTransitions.test.ts src/domain/tableCapacity.test.ts src/lib/serializers.test.ts src/services/report.service.test.ts src/services/table.service.test.ts src/services/shift.service.test.ts src/services/pricing.service.test.ts"
+    "test": "tsx --test src/domain/orderTransitions.test.ts src/domain/tableCapacity.test.ts src/lib/serializers.test.ts src/services/customer-otp.service.test.ts src/services/report.service.test.ts src/services/table.service.test.ts src/services/shift.service.test.ts src/services/pricing.service.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -22,6 +22,7 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
+    "jose": "^6.2.12",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
     "pino": "^9.5.0",
