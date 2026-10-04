@@ -146,30 +146,12 @@ export interface CustomerFirebaseVerifyPayload {
   idToken: string;
 }
 
-export interface CustomerOtpProviderResponse {
-  provider: "firebase" | "twilio" | "unavailable";
-}
-
-export interface CustomerOtpSendPayload {
-  phone: string;
-}
-
-export interface CustomerOtpVerifyPayload extends CustomerOtpSendPayload {
-  code: string;
-}
-
 export const api = {
   auth: {
     login: (payload: LoginPayload) =>
       apiRequest<LoginResponse>("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
     verifyCustomerFirebase: (payload: CustomerFirebaseVerifyPayload) =>
       apiRequest<LoginResponse>("/auth/customer/firebase/verify", { method: "POST", body: JSON.stringify(payload) }),
-    customerOtpProvider: () =>
-      apiRequest<CustomerOtpProviderResponse>("/auth/customer/otp/provider"),
-    sendCustomerOtp: (payload: CustomerOtpSendPayload) =>
-      apiRequest<{ sent: boolean }>("/auth/customer/otp/send", { method: "POST", body: JSON.stringify(payload) }),
-    verifyCustomerOtp: (payload: CustomerOtpVerifyPayload) =>
-      apiRequest<LoginResponse>("/auth/customer/otp/verify", { method: "POST", body: JSON.stringify(payload) }),
     refresh: refreshAccessToken,
     me: () => apiRequest<CurrentUserResponse>("/auth/me"),
     logout,

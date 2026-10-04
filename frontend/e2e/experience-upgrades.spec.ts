@@ -25,7 +25,7 @@ test("guest signatures filter to signature dishes and preserves a compact first 
   await expect(cards.first().locator(".featured-ribbon")).toBeVisible();
 });
 
-test("guest mobile OTP verification resumes the saved order without a password screen", async ({ page }) => {
+test("guest Firebase test OTP opens without CAPTCHA and resumes the saved order", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let firebaseToken = "";
   let createdOrder = false;
@@ -49,8 +49,9 @@ test("guest mobile OTP verification resumes the saved order without a password s
   await page.getByRole("button", { name: "Verify mobile to continue" }).click();
   await expect(page).toHaveURL(/\/customer\/verify/);
   await expect(page.getByText("Sign in to order", { exact: true })).toHaveCount(0);
-  await page.getByLabel("Mobile number").fill("98765 43210");
-  await expect(page.locator(".customer-recaptcha__heading > span").last()).toHaveText("Complete");
+  await expect(page.getByText(/Test mode is active/i)).toBeVisible();
+  await expect(page.locator(".customer-recaptcha")).toHaveCount(0);
+  await page.getByLabel("Fictional test number").fill("+1 650 555 3434");
   await expect(page.getByRole("button", { name: "Send OTP" })).toBeEnabled();
   await page.getByRole("button", { name: "Send OTP" }).click();
   await expect(page.getByRole("dialog", { name: "Enter your 6-digit code" })).toBeVisible();
@@ -58,45 +59,7 @@ test("guest mobile OTP verification resumes the saved order without a password s
   await page.getByLabel("6-digit OTP").fill("123456");
   await page.getByRole("button", { name: /Confirm OTP & place order/i }).click();
   await expect.poll(() => createdOrder).toBe(true);
-  expect(firebaseToken).toBe("firebase-test-phone:+919876543210");
-});
-
-test("server-side SMS OTP skips Google CAPTCHA and opens the code dialog after delivery", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  let sentPhone = "";
-  let verifiedOtp = "";
-  await page.route("**/api/v1/auth/customer/otp/provider", async (route) => {
-    await route.fulfill({ json: { success: true, data: { provider: "twilio" } } });
-  });
-  await page.route("**/api/v1/auth/customer/otp/send", async (route) => {
-    sentPhone = JSON.parse(route.request().postData() ?? "{}").phone;
-    await route.fulfill({ json: { success: true, data: { sent: true } } });
-  });
-  await page.route("**/api/v1/auth/customer/otp/verify", async (route) => {
-    verifiedOtp = JSON.parse(route.request().postData() ?? "{}").code;
-    await route.fulfill({ json: { success: true, data: { accessToken: "test-customer-token", user: { name: "Guest", role: "CUSTOMER" } } } });
-  });
-  await page.route("**/api/v1/orders**", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ json: { success: true, data: [] } });
-      return;
-    }
-    await route.fulfill({ json: { success: true, data: { id: "twilio-order", orderNumber: "EG-1002", mode: "PICKUP", status: "PLACED", paymentStatus: "UNPAID", items: [], pricing: { grandTotalPaise: 10000 } } } });
-  });
-  await page.goto("/menu?preview=1&guestAuth=0");
-  await page.locator(".menu-grid .add-button").first().click();
-  await page.getByRole("button", { name: /Open cart/i }).click();
-  await page.getByRole("button", { name: "Verify mobile to continue" }).click();
-  await expect(page.getByText("We will text a one-time 6-digit code to confirm this order.")).toBeVisible();
-  await expect(page.locator(".customer-recaptcha")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Send OTP" })).toBeEnabled();
-  await page.getByLabel("Mobile number").fill("98765 43210");
-  await page.getByRole("button", { name: "Send OTP" }).click();
-  await expect(page.getByRole("dialog", { name: "Enter your 6-digit code" })).toBeVisible();
-  expect(sentPhone).toBe("+919876543210");
-  await page.getByLabel("6-digit OTP").fill("123456");
-  await page.getByRole("button", { name: /Confirm OTP & place order/i }).click();
-  await expect.poll(() => verifiedOtp).toBe("123456");
+  expect(firebaseToken).toBe("firebase-test-phone:+16505553434");
 });
 
 test("cashier phone keeps the live bill one tap away without horizontal overflow", async ({ page }) => {

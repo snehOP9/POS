@@ -60,6 +60,26 @@ update, and confirm a forbidden role receives a safe 403 response.
 Never perform a real payment or production refund as a smoke check. Use
 Razorpay test mode and a disposable database.
 
+## Free Firebase phone-auth testing
+
+Use Firebase Authentication's fictional test phone numbers for a no-cost
+customer OTP check. Firebase does not send an SMS, does not consume SMS quota,
+and accepts only the six-digit code configured for that fictional number.
+
+1. In Firebase Console, open **Authentication > Sign-in method > Phone numbers
+   for testing** and add a fictional E.164 number plus a newly generated
+   six-digit code. Never use a real person's phone number.
+2. Set `VITE_FIREBASE_PHONE_TEST_MODE=true` only in the Vercel **Preview**
+   environment. Do not add it to Production or commit it to an `.env` file.
+3. Open a Preview deployment, enter that fictional number, select **Send OTP**,
+   and enter the configured code. The screen identifies test mode and shows no
+   Google CAPTCHA or SMS claim.
+4. Remove the Preview variable and delete or rotate the fictional number and
+   code after testing.
+
+The Preview flag enables Firebase's test app-verification behavior. It is not
+a live SMS provider and must never be used with real phone numbers.
+
 ## Planned integration coverage
 
 The next API test layer should run against an isolated MongoDB database and
