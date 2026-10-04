@@ -21,11 +21,17 @@ interface PhoneConfirmation {
   confirm: (code: string) => Promise<{ user: { getIdToken: () => Promise<string> } }>;
 }
 
+interface RecaptchaCallbacks {
+  onSolved: () => void;
+  onExpired: () => void;
+}
+
 let verifier: RecaptchaVerifier | undefined;
 
 const firebasePhoneErrorMessages: Record<string, string> = {
   "auth/captcha-check-failed": "Google reCAPTCHA could not verify this request. Complete the challenge if it appears, then try again.",
   "auth/code-expired": "That code has expired. Request a new code and try again.",
+  "auth/internal-error": "The SMS service could not complete the security check. Complete it again, then request a new code.",
   "auth/invalid-app-credential": "Google reCAPTCHA could not verify this request. Complete the challenge if it appears, then try again.",
   "auth/invalid-phone-number": "Enter a valid mobile number before requesting a code.",
   "auth/invalid-verification-code": "That 6-digit code is incorrect. Check the SMS and try again.",
@@ -44,8 +50,12 @@ export function firebasePhoneErrorMessage(error: unknown, action: "send" | "veri
   if (typeof code === "string" && firebasePhoneErrorMessages[code]) {
     return firebasePhoneErrorMessages[code];
   }
+  const detail = error instanceof Error ? error.message : "";
+  if (action === "send" && /captcha|recaptcha|app verifier|app credential/i.test(detail)) {
+    return "Complete the Google security check, then request a new code.";
+  }
   return action === "send"
-    ? "We could not send a code. Please check your connection and try again."
+    ? "The SMS service did not complete this request. Reload the security check and try again."
     : "We could not confirm that code. Please try again.";
 }
 
@@ -58,11 +68,33 @@ function auth() {
 }
 
 export function clearPhoneRecaptcha() {
-  verifier?.clear();
+  try {
+    verifier?.clear();
+  } catch {
+    // The provider can remove its iframe before React unmounts the container.
+  }
   verifier = undefined;
 }
 
-export async function requestFirebasePhoneCode(phone: string, container: HTMLElement): Promise<PhoneConfirmation> {
+export async function renderFirebasePhoneRecaptcha(
+  container: HTMLElement,
+  callbacks: RecaptchaCallbacks,
+): Promise<void> {
+  if (testMode) {
+    callbacks.onSolved();
+    return;
+  }
+
+  clearPhoneRecaptcha();
+  verifier = new RecaptchaVerifier(auth(), container, {
+    size: "normal",
+    callback: callbacks.onSolved,
+    "expired-callback": callbacks.onExpired,
+  });
+  await verifier.render();
+}
+
+export async function requestFirebasePhoneCode(phone: string): Promise<PhoneConfirmation> {
   if (testMode) {
     return {
       confirm: async (code: string) => {
@@ -72,8 +104,11 @@ export async function requestFirebasePhoneCode(phone: string, container: HTMLEle
     };
   }
 
-  clearPhoneRecaptcha();
-  verifier = new RecaptchaVerifier(auth(), container, { size: "invisible" });
+  if (!verifier) {
+    const error = new Error("Complete the Google security check before requesting a code.");
+    Object.assign(error, { code: "auth/captcha-check-failed" });
+    throw error;
+  }
   const confirmation = await signInWithPhoneNumber(auth(), phone, verifier);
   return confirmation;
 }
