@@ -21,6 +21,7 @@ import {
 import { usePos } from "@/shared/store/pos-store";
 import {
   clearPhoneRecaptcha,
+  firebasePhoneErrorMessage,
   firebasePhoneAuthConfigured,
   requestFirebasePhoneCode,
   type FirebasePhoneConfirmation,
@@ -53,8 +54,11 @@ export const CustomerVerificationPage = () => {
   const [resendAfter, setResendAfter] = useState(0);
   const confirmation = useRef<FirebasePhoneConfirmation>();
   const recaptchaContainer = useRef<HTMLDivElement>(null);
+  const otpDialog = useRef<HTMLDialogElement>(null);
+  const otpInput = useRef<HTMLInputElement>(null);
   const phone = useMemo(() => indianMobileNumber(mobileInput), [mobileInput]);
   const phoneEnding = phone?.slice(-4) ?? "";
+  const maskedPhone = `+91 ${String.fromCharCode(0x2022).repeat(6)}${phoneEnding}`;
   const routeState = location.state as CustomerVerificationState | null;
   const returnTo =
     typeof routeState?.from === "string" && routeState.from.startsWith("/menu")
@@ -72,6 +76,26 @@ export const CustomerVerificationPage = () => {
   }, [resendAfter]);
 
   useEffect(() => () => clearPhoneRecaptcha(), []);
+
+  useEffect(() => {
+    const dialog = otpDialog.current;
+    if (!dialog) return;
+    if (step === "code") {
+      if (!dialog.open) dialog.showModal();
+      window.requestAnimationFrame(() => otpInput.current?.focus());
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [step]);
+
+  const useAnotherNumber = () => {
+    clearPhoneRecaptcha();
+    confirmation.current = undefined;
+    setStep("phone");
+    setCode("");
+    setMessage("");
+    setStatus("idle");
+  };
 
   const requestCode = async () => {
     if (!phone) {
@@ -94,13 +118,9 @@ export const CustomerVerificationPage = () => {
       setCode("");
       setResendAfter(30);
       setStatus("idle");
-      setMessage(`A 6-digit code was sent to +91 ••••••${phoneEnding}.`);
+      setMessage("");
     } catch (error) {
-      setMessage(
-        error instanceof ApiError
-          ? error.message
-          : "We could not send a code. Please check your connection and try again.",
-      );
+      setMessage(error instanceof ApiError ? error.message : firebasePhoneErrorMessage(error, "send"));
       setStatus("error");
     }
   };
@@ -128,11 +148,7 @@ export const CustomerVerificationPage = () => {
       login("CUSTOMER", result.user.name, result.accessToken);
       navigate(returnTo, { replace: true, state: { proceedOrder: true } });
     } catch (error) {
-      setMessage(
-        error instanceof ApiError
-          ? error.message
-          : "We could not confirm that code. Please try again.",
-      );
+      setMessage(error instanceof ApiError ? error.message : firebasePhoneErrorMessage(error, "verify"));
       setStatus("error");
     }
   };
@@ -198,7 +214,7 @@ export const CustomerVerificationPage = () => {
                 ? cart.length
                   ? `Your ${cart.length} ${cart.length === 1 ? "item is" : "items are"} saved. Enter your mobile number to send the order.`
                   : "Choose your dishes first, then use your mobile number to securely place the order."
-                : `Enter the 6-digit SMS code sent to +91 ••••••${phoneEnding}.`}
+                : `Enter the 6-digit SMS code sent to ${maskedPhone}.`}
             </p>
           </div>
           {!phoneAuthAvailable && (
@@ -207,7 +223,7 @@ export const CustomerVerificationPage = () => {
             </p>
           )}
           <div ref={recaptchaContainer} aria-hidden="true" />
-          {step === "phone" ? (
+          {step === "phone" && (
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -261,13 +277,48 @@ export const CustomerVerificationPage = () => {
                 )}
               </button>
             </form>
-          ) : (
+          )}
+          <div className="login-form__foot">
+            <LockKeyhole size={15} /> Your mobile number is used to confirm and
+            identify this order.
+          </div>
+        </div>
+      </section>
+      <dialog
+        ref={otpDialog}
+        className="otp-dialog"
+        aria-labelledby="otp-dialog-title"
+        aria-describedby="otp-dialog-description"
+        onCancel={(event) => {
+          event.preventDefault();
+          useAnotherNumber();
+        }}
+      >
+        <div className="otp-dialog__content">
+          <div className="otp-dialog__top">
+            <span className="otp-dialog__badge">
+              <MessageSquareText size={17} /> Code sent
+            </span>
+            <button
+              type="button"
+              className="otp-dialog__close"
+              onClick={useAnotherNumber}
+              aria-label="Back to phone entry"
+            >
+              <ArrowLeft size={17} />
+            </button>
+          </div>
+          <h2 id="otp-dialog-title">Enter your 6-digit code</h2>
+          <p id="otp-dialog-description">
+            We sent a one-time code to {maskedPhone}. It expires shortly for your security.
+          </p>
             <form onSubmit={verifyCode}>
               <label className="form-field">
                 <span>6-digit OTP</span>
                 <div className="otp-code-input">
                   <MessageSquareText size={18} />
                   <input
+                    ref={otpInput}
                     value={code}
                     onChange={(event) =>
                       setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
@@ -276,10 +327,9 @@ export const CustomerVerificationPage = () => {
                     inputMode="numeric"
                     pattern="[0-9]{6}"
                     maxLength={6}
-                    placeholder="• • • • • •"
+                    placeholder={Array(6).fill(String.fromCharCode(0x2022)).join(" ")}
                     aria-describedby="otp-help"
                     required
-                    autoFocus
                   />
                 </div>
               </label>
@@ -316,14 +366,7 @@ export const CustomerVerificationPage = () => {
               <div className="customer-otp-actions">
                 <button
                   type="button"
-                  onClick={() => {
-                    clearPhoneRecaptcha();
-                    confirmation.current = undefined;
-                    setStep("phone");
-                    setCode("");
-                    setMessage("");
-                    setStatus("idle");
-                  }}
+                  onClick={useAnotherNumber}
                 >
                   Use another number
                 </button>
@@ -336,13 +379,8 @@ export const CustomerVerificationPage = () => {
                 </button>
               </div>
             </form>
-          )}
-          <div className="login-form__foot">
-            <LockKeyhole size={15} /> Your mobile number is used to confirm and
-            identify this order.
-          </div>
         </div>
-      </section>
+      </dialog>
     </main>
   );
 };
