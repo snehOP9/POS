@@ -30,6 +30,7 @@ import {
 
 type VerificationStep = "phone" | "code";
 type RecaptchaState = "loading" | "ready" | "verified" | "failed";
+type OtpProvider = "loading" | "firebase" | "twilio" | "unavailable";
 
 interface CustomerVerificationState {
   from?: unknown;
@@ -68,7 +69,12 @@ export const CustomerVerificationPage = () => {
     typeof routeState?.from === "string" && routeState.from.startsWith("/menu")
       ? routeState.from
       : "/menu";
-  const phoneAuthAvailable = apiIsConfigured && firebasePhoneAuthConfigured;
+  const firebaseTestMode = import.meta.env.DEV && new URLSearchParams(location.search).get("firebaseTest") === "1";
+  const [otpProvider, setOtpProvider] = useState<OtpProvider>(firebaseTestMode ? "firebase" : "loading");
+  const requiresRecaptcha = otpProvider === "firebase";
+  const phoneAuthAvailable = apiIsConfigured && (
+    otpProvider === "twilio" || (otpProvider === "firebase" && firebasePhoneAuthConfigured)
+  );
 
   useEffect(() => {
     if (resendAfter <= 0) return;
@@ -80,7 +86,31 @@ export const CustomerVerificationPage = () => {
   }, [resendAfter]);
 
   useEffect(() => {
-    if (!phoneAuthAvailable || step !== "phone" || !recaptchaContainer.current) return;
+    let mounted = true;
+    if (!apiIsConfigured) {
+      setOtpProvider("unavailable");
+      return () => { mounted = false; };
+    }
+    if (firebaseTestMode) {
+      setOtpProvider("firebase");
+      return () => { mounted = false; };
+    }
+    setOtpProvider("loading");
+    void api.auth.customerOtpProvider()
+      .then(({ provider }) => {
+        if (mounted) setOtpProvider(provider);
+      })
+      .catch(() => {
+        if (mounted) setOtpProvider("unavailable");
+      });
+    return () => { mounted = false; };
+  }, [firebaseTestMode]);
+
+  useEffect(() => {
+    if (!requiresRecaptcha || !phoneAuthAvailable || step !== "phone" || !recaptchaContainer.current) {
+      clearPhoneRecaptcha();
+      return;
+    }
     let mounted = true;
     setRecaptchaState("loading");
     void renderFirebasePhoneRecaptcha(recaptchaContainer.current, {
@@ -106,7 +136,7 @@ export const CustomerVerificationPage = () => {
       mounted = false;
       clearPhoneRecaptcha();
     };
-  }, [phoneAuthAvailable, recaptchaAttempt, step]);
+  }, [phoneAuthAvailable, recaptchaAttempt, requiresRecaptcha, step]);
 
   useEffect(() => {
     const dialog = otpDialog.current;
@@ -141,8 +171,8 @@ export const CustomerVerificationPage = () => {
     setStep("phone");
     setCode("");
     setStatus("idle");
-    setMessage("Complete the Google security check again, then select Send OTP to request another code.");
-    setRecaptchaAttempt((current) => current + 1);
+    setMessage(requiresRecaptcha ? "Complete the Google security check again, then select Send OTP to request another code." : "");
+    if (requiresRecaptcha) setRecaptchaAttempt((current) => current + 1);
   };
 
   const requestCode = async () => {
@@ -151,7 +181,12 @@ export const CustomerVerificationPage = () => {
       setStatus("error");
       return;
     }
-    if (recaptchaState !== "verified") {
+    if (!phoneAuthAvailable) {
+      setMessage("Mobile OTP is not configured on this site yet.");
+      setStatus("error");
+      return;
+    }
+    if (requiresRecaptcha && recaptchaState !== "verified") {
       setMessage("Complete the Google security check before requesting a code.");
       setStatus("error");
       return;
@@ -159,17 +194,23 @@ export const CustomerVerificationPage = () => {
     setStatus("sending");
     setMessage("");
     try {
-      confirmation.current = await requestFirebasePhoneCode(phone);
+      if (otpProvider === "twilio") {
+        await api.auth.sendCustomerOtp({ phone });
+      } else {
+        confirmation.current = await requestFirebasePhoneCode(phone);
+      }
       setStep("code");
       setCode("");
       setResendAfter(30);
       setStatus("idle");
       setMessage("");
     } catch (error) {
-      setMessage(error instanceof ApiError ? error.message : firebasePhoneErrorMessage(error, "send"));
+      setMessage(error instanceof ApiError ? error.message : requiresRecaptcha ? firebasePhoneErrorMessage(error, "send") : "We could not send a code right now. Please try again shortly.");
       setStatus("error");
-      clearPhoneRecaptcha();
-      setRecaptchaAttempt((current) => current + 1);
+      if (requiresRecaptcha) {
+        clearPhoneRecaptcha();
+        setRecaptchaAttempt((current) => current + 1);
+      }
     }
   };
 
@@ -184,14 +225,13 @@ export const CustomerVerificationPage = () => {
     setStatus("verifying");
     setMessage("");
     try {
-      if (!confirmation.current)
-        throw new Error(
-          "Request a new code before confirming your mobile number.",
-        );
-      const firebaseResult = await confirmation.current.confirm(code);
-      const result = await api.auth.verifyCustomerFirebase({
-        idToken: await firebaseResult.user.getIdToken(),
-      });
+      const result = otpProvider === "twilio"
+        ? await api.auth.verifyCustomerOtp({ phone, code })
+        : await (async () => {
+          if (!confirmation.current) throw new Error("Request a new code before confirming your mobile number.");
+          const firebaseResult = await confirmation.current.confirm(code);
+          return api.auth.verifyCustomerFirebase({ idToken: await firebaseResult.user.getIdToken() });
+        })();
       setAccessToken(result.accessToken);
       login("CUSTOMER", result.user.name, result.accessToken);
       navigate(returnTo, { replace: true, state: { proceedOrder: true } });
@@ -265,7 +305,7 @@ export const CustomerVerificationPage = () => {
                 : `Enter the 6-digit SMS code sent to ${maskedPhone}.`}
             </p>
           </div>
-          {!phoneAuthAvailable && (
+          {otpProvider === "unavailable" && (
             <p className="login-error" role="status">
               <CircleAlert size={17} /> Mobile OTP is not configured on this site yet.
             </p>
@@ -301,9 +341,14 @@ export const CustomerVerificationPage = () => {
                 </div>
               </label>
               <p id="mobile-help" className="form-help">
-                Complete the Google security check below. Send OTP unlocks when it is complete.
+                {otpProvider === "loading"
+                  ? "Preparing secure SMS delivery..."
+                  : requiresRecaptcha
+                    ? "Complete the Google security check below. Send OTP unlocks when it is complete."
+                    : "We will text a one-time 6-digit code to confirm this order."}
               </p>
-              <section className="customer-recaptcha" aria-labelledby="security-check-title">
+              {requiresRecaptcha && (
+                <section className="customer-recaptcha" aria-labelledby="security-check-title">
                 <div className="customer-recaptcha__heading">
                   <span id="security-check-title"><ShieldCheck size={16} /> Security check</span>
                   <span aria-live="polite">
@@ -323,7 +368,8 @@ export const CustomerVerificationPage = () => {
                     Reload security check
                   </button>
                 )}
-              </section>
+                </section>
+              )}
               {message && (
                 <p className="login-error" role="alert">
                   <CircleAlert size={17} /> {message}
@@ -332,13 +378,15 @@ export const CustomerVerificationPage = () => {
               <button
                 type="submit"
                 className="button button--saffron button--full login-submit"
-                disabled={status === "sending" || !phoneAuthAvailable || recaptchaState !== "verified"}
+                disabled={status === "sending" || !phoneAuthAvailable || (requiresRecaptcha && recaptchaState !== "verified")}
               >
-                {!phoneAuthAvailable ? (
+                {otpProvider === "loading" ? (
+                  "Preparing mobile OTP..."
+                ) : !phoneAuthAvailable ? (
                   "Mobile OTP unavailable"
                 ) : status === "sending" ? (
                   "Sending secure code..."
-                ) : recaptchaState !== "verified" ? (
+                ) : requiresRecaptcha && recaptchaState !== "verified" ? (
                   "Complete security check"
                 ) : (
                   <>
