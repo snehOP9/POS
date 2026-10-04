@@ -23,11 +23,13 @@ import {
   clearPhoneRecaptcha,
   firebasePhoneErrorMessage,
   firebasePhoneAuthConfigured,
+  renderFirebasePhoneRecaptcha,
   requestFirebasePhoneCode,
   type FirebasePhoneConfirmation,
 } from "./firebase-phone-auth";
 
 type VerificationStep = "phone" | "code";
+type RecaptchaState = "loading" | "ready" | "verified" | "failed";
 
 interface CustomerVerificationState {
   from?: unknown;
@@ -52,6 +54,8 @@ export const CustomerVerificationPage = () => {
   >("idle");
   const [message, setMessage] = useState("");
   const [resendAfter, setResendAfter] = useState(0);
+  const [recaptchaState, setRecaptchaState] = useState<RecaptchaState>("loading");
+  const [recaptchaAttempt, setRecaptchaAttempt] = useState(0);
   const confirmation = useRef<FirebasePhoneConfirmation>();
   const recaptchaContainer = useRef<HTMLDivElement>(null);
   const otpDialog = useRef<HTMLDialogElement>(null);
@@ -75,7 +79,34 @@ export const CustomerVerificationPage = () => {
     return () => window.clearInterval(timer);
   }, [resendAfter]);
 
-  useEffect(() => () => clearPhoneRecaptcha(), []);
+  useEffect(() => {
+    if (!phoneAuthAvailable || step !== "phone" || !recaptchaContainer.current) return;
+    let mounted = true;
+    setRecaptchaState("loading");
+    void renderFirebasePhoneRecaptcha(recaptchaContainer.current, {
+      onSolved: () => {
+        if (mounted) setRecaptchaState("verified");
+      },
+      onExpired: () => {
+        if (mounted) setRecaptchaState("ready");
+      },
+    })
+      .then(() => {
+        if (mounted) {
+          setRecaptchaState((current) => current === "verified" ? current : "ready");
+        }
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        setRecaptchaState("failed");
+        setStatus("error");
+        setMessage(firebasePhoneErrorMessage(error, "send"));
+      });
+    return () => {
+      mounted = false;
+      clearPhoneRecaptcha();
+    };
+  }, [phoneAuthAvailable, recaptchaAttempt, step]);
 
   useEffect(() => {
     const dialog = otpDialog.current;
@@ -97,23 +128,38 @@ export const CustomerVerificationPage = () => {
     setStatus("idle");
   };
 
+  const reloadSecurityCheck = () => {
+    clearPhoneRecaptcha();
+    setRecaptchaAttempt((current) => current + 1);
+    setMessage("");
+    setStatus("idle");
+  };
+
+  const requestAnotherCode = () => {
+    clearPhoneRecaptcha();
+    confirmation.current = undefined;
+    setStep("phone");
+    setCode("");
+    setStatus("idle");
+    setMessage("Complete the Google security check again, then select Send OTP to request another code.");
+    setRecaptchaAttempt((current) => current + 1);
+  };
+
   const requestCode = async () => {
     if (!phone) {
       setMessage("Enter a valid 10-digit Indian mobile number.");
       setStatus("error");
       return;
     }
+    if (recaptchaState !== "verified") {
+      setMessage("Complete the Google security check before requesting a code.");
+      setStatus("error");
+      return;
+    }
     setStatus("sending");
     setMessage("");
     try {
-      if (!recaptchaContainer.current)
-        throw new Error(
-          "Mobile verification is still loading. Please try again.",
-        );
-      confirmation.current = await requestFirebasePhoneCode(
-        phone,
-        recaptchaContainer.current,
-      );
+      confirmation.current = await requestFirebasePhoneCode(phone);
       setStep("code");
       setCode("");
       setResendAfter(30);
@@ -122,6 +168,8 @@ export const CustomerVerificationPage = () => {
     } catch (error) {
       setMessage(error instanceof ApiError ? error.message : firebasePhoneErrorMessage(error, "send"));
       setStatus("error");
+      clearPhoneRecaptcha();
+      setRecaptchaAttempt((current) => current + 1);
     }
   };
 
@@ -222,7 +270,6 @@ export const CustomerVerificationPage = () => {
               <CircleAlert size={17} /> Mobile OTP is not configured on this site yet.
             </p>
           )}
-          <div ref={recaptchaContainer} aria-hidden="true" />
           {step === "phone" && (
             <form
               onSubmit={(event) => {
@@ -254,8 +301,29 @@ export const CustomerVerificationPage = () => {
                 </div>
               </label>
               <p id="mobile-help" className="form-help">
-                We will text a one-time 6-digit code. Google reCAPTCHA protects this request.
+                Complete the Google security check below. Send OTP unlocks when it is complete.
               </p>
+              <section className="customer-recaptcha" aria-labelledby="security-check-title">
+                <div className="customer-recaptcha__heading">
+                  <span id="security-check-title"><ShieldCheck size={16} /> Security check</span>
+                  <span aria-live="polite">
+                    {recaptchaState === "verified" ? "Complete" : recaptchaState === "loading" ? "Loading…" : "Required"}
+                  </span>
+                </div>
+                <div ref={recaptchaContainer} className="customer-recaptcha__widget" />
+                {recaptchaState !== "verified" && (
+                  <p className="form-help">
+                    {recaptchaState === "failed"
+                      ? "The security check could not load. Reload it and try again."
+                      : "Check the box or complete Google’s prompt to continue."}
+                  </p>
+                )}
+                {recaptchaState === "failed" && (
+                  <button type="button" className="customer-recaptcha__reload" onClick={reloadSecurityCheck}>
+                    Reload security check
+                  </button>
+                )}
+              </section>
               {message && (
                 <p className="login-error" role="alert">
                   <CircleAlert size={17} /> {message}
@@ -264,12 +332,14 @@ export const CustomerVerificationPage = () => {
               <button
                 type="submit"
                 className="button button--saffron button--full login-submit"
-                disabled={status === "sending" || !phoneAuthAvailable}
+                disabled={status === "sending" || !phoneAuthAvailable || recaptchaState !== "verified"}
               >
                 {!phoneAuthAvailable ? (
                   "Mobile OTP unavailable"
                 ) : status === "sending" ? (
                   "Sending secure code..."
+                ) : recaptchaState !== "verified" ? (
+                  "Complete security check"
                 ) : (
                   <>
                     Send OTP <ArrowRight size={18} />
@@ -372,10 +442,10 @@ export const CustomerVerificationPage = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void requestCode()}
-                  disabled={resendAfter > 0 || status === "sending"}
+                  onClick={requestAnotherCode}
+                  disabled={resendAfter > 0}
                 >
-                  {resendAfter > 0 ? remainingLabel(resendAfter) : "Resend OTP"}
+                  {resendAfter > 0 ? remainingLabel(resendAfter) : "Request another code"}
                 </button>
               </div>
             </form>

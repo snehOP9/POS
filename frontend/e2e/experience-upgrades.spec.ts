@@ -50,6 +50,8 @@ test("guest mobile OTP verification resumes the saved order without a password s
   await expect(page).toHaveURL(/\/customer\/verify/);
   await expect(page.getByText("Sign in to order", { exact: true })).toHaveCount(0);
   await page.getByLabel("Mobile number").fill("98765 43210");
+  await expect(page.locator(".customer-recaptcha__heading > span").last()).toHaveText("Complete");
+  await expect(page.getByRole("button", { name: "Send OTP" })).toBeEnabled();
   await page.getByRole("button", { name: "Send OTP" }).click();
   await expect(page.getByRole("dialog", { name: "Enter your 6-digit code" })).toBeVisible();
   await expect(page.getByLabel("6-digit OTP")).toBeVisible();
