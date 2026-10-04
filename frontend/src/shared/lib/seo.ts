@@ -1,4 +1,4 @@
-export type PublicRoute = "/menu" | "/privacy" | "/terms";
+export type PublicRoute = "/menu" | "/privacy" | "/terms" | "/contact";
 
 type PageMetadata = {
   title: string;
@@ -20,6 +20,11 @@ const pages: Record<PublicRoute, PageMetadata> = {
   "/terms": {
     title: "Terms of use | EmberServe POS",
     description: "Terms for using the EmberServe POS customer and staff application.",
+    indexable: true,
+  },
+  "/contact": {
+    title: "Contact and data requests | EmberServe POS",
+    description: "Contact EmberServe POS for platform, privacy, security and restaurant-order support enquiries.",
     indexable: true,
   },
 };
