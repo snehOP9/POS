@@ -57,6 +57,7 @@ export const App = () => <BrowserRouter>
         <Route path="/menu" element={<MenuPage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
         <Route path="/terms" element={<LegalPage kind="terms" />} />
+        <Route path="/contact" element={<LegalPage kind="contact" />} />
         <Route path="/cashier" element={<RoleGuard role="CASHIER"><CashierPage /></RoleGuard>} />
         <Route path="/waiter" element={<RoleGuard role="WAITER"><WaiterPage /></RoleGuard>} />
         <Route path="/kitchen" element={<RoleGuard role="KITCHEN"><KitchenPage /></RoleGuard>} />

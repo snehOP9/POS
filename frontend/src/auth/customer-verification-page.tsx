@@ -319,7 +319,7 @@ export const CustomerVerificationPage = () => {
               <p id="mobile-help" className="form-help">
                 {firebasePhoneTestMode
                   ? "Test mode is active. Use a fictional Firebase test number and its configured 6-digit code. No SMS will be sent."
-                  : "Complete the Google security check below. Send OTP unlocks when it is complete."}
+                  : <>By selecting Send OTP, you request a one-time SMS verification message and authorise the secure transfer of this mobile number to Firebase Authentication for verification and abuse prevention. Your carrier’s standard messaging rates may apply. Complete the Google security check below; Send OTP unlocks when it is complete. Read the <Link to="/privacy">Privacy Notice</Link> and <Link to="/terms">Terms of Use</Link>. Never share your one-time code.</>}
               </p>
               {firebasePhoneTestMode ? (
                 <div ref={recaptchaContainer} className="customer-recaptcha__test-verifier" aria-hidden="true" />
