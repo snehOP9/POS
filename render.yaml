@@ -3,7 +3,7 @@ services:
     name: emberserve-api
     runtime: node
     region: singapore
-    plan: starter
+    plan: free
     rootDir: .
     buildCommand: npm ci --include=dev && npm run build --workspace=@emberserve/api
     startCommand: npm run start --workspace=@emberserve/api
