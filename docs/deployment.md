@@ -39,7 +39,10 @@ VITE_API_URL=/api/v1 and Nginx serves the React Router fallback.
    [backup and restore](backup-restore.md).
 3. Provision production secrets outside source control. Use independent JWT
    access/refresh secrets, production Razorpay credentials, a restricted
-   CLIENT_URL, production MONGODB_URI, and COOKIE_SECURE=true.
+   CLIENT_URL, production MONGODB_URI, and COOKIE_SECURE=true. For customer
+   phone verification, set the API's FIREBASE_PROJECT_ID to the same Firebase
+   project as the web build. The API verifies signed phone tokens against
+   Google's published signing keys; no Firebase service-account key is stored.
 4. Deploy the API and web images. Keep MongoDB private to the application
    network or use a managed cluster with an IP/network allowlist.
 5. Terminate TLS at a load balancer or edge proxy. Redirect HTTP to HTTPS,
@@ -85,8 +88,19 @@ log it, and retain a verified backup until the next release has stabilized.
 | JWT_ACCESS_SECRET, JWT_REFRESH_SECRET | Yes | Different high-entropy secrets. |
 | ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL | Yes | Short access lifetime, rotated refresh lifetime. |
 | RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET | If payments enabled | Secret/key secret remain API-only. |
+| FIREBASE_PROJECT_ID | If customer phone verification is enabled | Public Firebase project identifier; must match the web build. |
+| VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID | If customer phone verification is enabled | Public Firebase web configuration, supplied during the web build. |
 | RESTAURANT_TIMEZONE, LOG_LEVEL, TRUST_PROXY | Yes | Default Asia/Kolkata; trust only a known reverse proxy. |
 | COOKIE_DOMAIN, COOKIE_SECURE | When cookies are used | Secure must be true over production HTTPS. |
 | UPLOAD_PROVIDER, UPLOAD_PATH, MAX_UPLOAD_SIZE | If uploads enabled | Enforce type/size/dimension policy. |
 
 See .env.example for safe placeholder names, never values.
+
+## Firebase phone verification
+
+Enable the Firebase Phone provider, configure an SMS region policy, and add
+each deployed web domain to Firebase Authentication's authorized domains. The
+web client uses Firebase's invisible reCAPTCHA before requesting an SMS. The
+API accepts only fresh Firebase phone ID tokens signed for its configured
+project. Validate a real test number only after both the web and API
+environments have matching Firebase project settings.
