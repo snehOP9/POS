@@ -3,30 +3,16 @@ import rateLimit from "express-rate-limit";
 
 import { env } from "../config/env.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { conflict, serviceUnavailable, unauthorized } from "../lib/errors.js";
+import { conflict, unauthorized } from "../lib/errors.js";
 import { sendSuccess } from "../lib/response.js";
 import { requireAuth, authContext } from "../middleware/auth.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { AccountModel } from "../models/Account.js";
 import { issueTokens, passwordMatches, publicAccount, verifyToken, hashPassword } from "../services/auth.service.js";
-import {
-  customerOtpProvider,
-  guestAccountEmail,
-  guestAccountPassword,
-  sendCustomerTwilioCode,
-  verifyCustomerFirebaseIdToken,
-  verifyCustomerTwilioCode
-} from "../services/customer-otp.service.js";
+import { guestAccountEmail, guestAccountPassword, verifyCustomerFirebaseIdToken } from "../services/customer-otp.service.js";
 import { getSingleRestaurant } from "../services/restaurant.service.js";
 import { disconnectAccountSockets } from "../services/socket.service.js";
-import {
-  customerFirebaseVerifySchema,
-  customerOtpSendSchema,
-  customerOtpVerifySchema,
-  loginRequestSchema,
-  logoutRequestSchema,
-  refreshRequestSchema
-} from "./schemas.js";
+import { customerFirebaseVerifySchema, loginRequestSchema, logoutRequestSchema, refreshRequestSchema } from "./schemas.js";
 
 const refreshCookieName = "emberserve_refresh";
 
@@ -61,15 +47,26 @@ const customerOtpVerifyLimiter = rateLimit({
   handler: (_request, response) => response.status(429).json({ success: false, error: { code: "OTP_RATE_LIMITED", message: "Too many verification attempts. Please request a new code and try again later." } })
 });
 
-const customerOtpSendLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 3,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: (_request, response) => response.status(429).json({ success: false, error: { code: "OTP_RATE_LIMITED", message: "Too many codes were requested. Please wait a few minutes and try again." } })
-});
+authRouter.post("/login", validateRequest(loginRequestSchema), asyncHandler(async (request, response) => {
+  const { email, password } = request.body as { email: string; password: string };
+  const account = await AccountModel.findOne({ email: email.toLowerCase() }).select("+passwordHash +refreshTokenHash +tokenVersion");
+  if (!account || !account.active || !(await passwordMatches(password, account.passwordHash))) {
+    throw unauthorized("AUTH_INVALID_CREDENTIALS", "Email or password is incorrect");
+  }
+  if (account.role === "CUSTOMER") {
+    throw unauthorized("CUSTOMER_MOBILE_VERIFICATION_REQUIRED", "Guest access uses mobile verification. Return to the menu to confirm your mobile number.");
+  }
+  const tokens = issueTokens(account);
+  account.refreshTokenHash = await hashPassword(tokens.refreshToken);
+  await account.save();
+  response.cookie(refreshCookieName, tokens.refreshToken, refreshCookieOptions());
+  sendSuccess(response, { accessToken: tokens.accessToken, user: userPayload(account) });
+}));
 
-async function completeCustomerLogin(phone: string, response: Parameters<typeof sendSuccess>[0]): Promise<void> {
+authRouter.post("/customer/firebase/verify", customerOtpVerifyLimiter, validateRequest(customerFirebaseVerifySchema), asyncHandler(async (request, response) => {
+  const { idToken } = request.body as { idToken: string };
+  const phone = await verifyCustomerFirebaseIdToken(idToken);
+
   const restaurant = await getSingleRestaurant();
   let account = await AccountModel.findOne({ restaurantId: restaurant._id, phone }).select("+passwordHash +refreshTokenHash +tokenVersion");
   if (account && account.role !== "CUSTOMER") {
@@ -100,49 +97,6 @@ async function completeCustomerLogin(phone: string, response: Parameters<typeof 
   await account.save();
   response.cookie(refreshCookieName, tokens.refreshToken, refreshCookieOptions());
   sendSuccess(response, { accessToken: tokens.accessToken, user: userPayload(account) });
-}
-
-authRouter.post("/login", validateRequest(loginRequestSchema), asyncHandler(async (request, response) => {
-  const { email, password } = request.body as { email: string; password: string };
-  const account = await AccountModel.findOne({ email: email.toLowerCase() }).select("+passwordHash +refreshTokenHash +tokenVersion");
-  if (!account || !account.active || !(await passwordMatches(password, account.passwordHash))) {
-    throw unauthorized("AUTH_INVALID_CREDENTIALS", "Email or password is incorrect");
-  }
-  if (account.role === "CUSTOMER") {
-    throw unauthorized("CUSTOMER_MOBILE_VERIFICATION_REQUIRED", "Guest access uses mobile verification. Return to the menu to confirm your mobile number.");
-  }
-  const tokens = issueTokens(account);
-  account.refreshTokenHash = await hashPassword(tokens.refreshToken);
-  await account.save();
-  response.cookie(refreshCookieName, tokens.refreshToken, refreshCookieOptions());
-  sendSuccess(response, { accessToken: tokens.accessToken, user: userPayload(account) });
-}));
-
-authRouter.get("/customer/otp/provider", asyncHandler(async (_request, response) => {
-  sendSuccess(response, { provider: customerOtpProvider() });
-}));
-
-authRouter.post("/customer/otp/send", customerOtpSendLimiter, validateRequest(customerOtpSendSchema), asyncHandler(async (request, response) => {
-  if (customerOtpProvider() !== "twilio") {
-    throw serviceUnavailable("OTP_DELIVERY_NOT_CONFIGURED", "CAPTCHA-free SMS delivery is not configured for this restaurant yet.");
-  }
-  const { phone } = request.body as { phone: string };
-  await sendCustomerTwilioCode(phone);
-  sendSuccess(response, { sent: true });
-}));
-
-authRouter.post("/customer/otp/verify", customerOtpVerifyLimiter, validateRequest(customerOtpVerifySchema), asyncHandler(async (request, response) => {
-  if (customerOtpProvider() !== "twilio") {
-    throw serviceUnavailable("OTP_DELIVERY_NOT_CONFIGURED", "CAPTCHA-free SMS delivery is not configured for this restaurant yet.");
-  }
-  const { phone, code } = request.body as { phone: string; code: string };
-  await completeCustomerLogin(await verifyCustomerTwilioCode(phone, code), response);
-}));
-
-authRouter.post("/customer/firebase/verify", customerOtpVerifyLimiter, validateRequest(customerFirebaseVerifySchema), asyncHandler(async (request, response) => {
-  const { idToken } = request.body as { idToken: string };
-  const phone = await verifyCustomerFirebaseIdToken(idToken);
-  await completeCustomerLogin(phone, response);
 }));
 
 authRouter.post("/refresh", validateRequest(refreshRequestSchema), asyncHandler(async (request, response) => {

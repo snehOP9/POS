@@ -29,20 +29,6 @@ export const customerFirebaseVerifySchema = z.object({
   query: blank
 });
 
-const customerOtpPhoneSchema = z.string().trim().regex(/^\+[1-9][0-9]{7,14}$/, "Enter a valid phone number in international format");
-
-export const customerOtpSendSchema = z.object({
-  body: z.object({ phone: customerOtpPhoneSchema }).strict(),
-  params: blank,
-  query: blank
-});
-
-export const customerOtpVerifySchema = z.object({
-  body: z.object({ phone: customerOtpPhoneSchema, code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code") }).strict(),
-  params: blank,
-  query: blank
-});
-
 export const menuQuerySchema = z.object({
   body: optionalBlank,
   params: blank,

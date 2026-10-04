@@ -13,9 +13,14 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID?.trim(),
 };
 
-const testMode = import.meta.env.DEV && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("firebaseTest") === "1";
+const fixtureMode = import.meta.env.DEV && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("firebaseTest") === "1";
 
-export const firebasePhoneAuthConfigured = testMode || Object.values(firebaseConfig).every(Boolean);
+// The public flag is scoped to Vercel Preview only. The local fixture keeps
+// browser coverage deterministic. Both modes work only with fictional numbers
+// and never send an SMS.
+export const firebasePhoneTestMode = fixtureMode || import.meta.env.VITE_FIREBASE_PHONE_TEST_MODE === "true";
+
+export const firebasePhoneAuthConfigured = fixtureMode || Object.values(firebaseConfig).every(Boolean);
 
 interface PhoneConfirmation {
   confirm: (code: string) => Promise<{ user: { getIdToken: () => Promise<string> } }>;
@@ -60,10 +65,13 @@ export function firebasePhoneErrorMessage(error: unknown, action: "send" | "veri
 }
 
 function auth() {
-  if (!firebasePhoneAuthConfigured || testMode) throw new Error("Firebase Phone Auth is not configured");
+  if (!firebasePhoneAuthConfigured || fixtureMode) throw new Error("Firebase Phone Auth is not configured");
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   const firebaseAuth = getAuth(app);
   firebaseAuth.languageCode = "en";
+  if (firebasePhoneTestMode) {
+    firebaseAuth.settings.appVerificationDisabledForTesting = true;
+  }
   return firebaseAuth;
 }
 
@@ -80,14 +88,14 @@ export async function renderFirebasePhoneRecaptcha(
   container: HTMLElement,
   callbacks: RecaptchaCallbacks,
 ): Promise<void> {
-  if (testMode) {
+  if (fixtureMode) {
     callbacks.onSolved();
     return;
   }
 
   clearPhoneRecaptcha();
   verifier = new RecaptchaVerifier(auth(), container, {
-    size: "normal",
+    size: firebasePhoneTestMode ? "invisible" : "normal",
     callback: callbacks.onSolved,
     "expired-callback": callbacks.onExpired,
   });
@@ -95,7 +103,7 @@ export async function renderFirebasePhoneRecaptcha(
 }
 
 export async function requestFirebasePhoneCode(phone: string): Promise<PhoneConfirmation> {
-  if (testMode) {
+  if (fixtureMode) {
     return {
       confirm: async (code: string) => {
         if (code !== "123456") throw new Error("Enter the test code 123456.");

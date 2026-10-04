@@ -23,6 +23,7 @@ import {
   clearPhoneRecaptcha,
   firebasePhoneErrorMessage,
   firebasePhoneAuthConfigured,
+  firebasePhoneTestMode,
   renderFirebasePhoneRecaptcha,
   requestFirebasePhoneCode,
   type FirebasePhoneConfirmation,
@@ -30,7 +31,6 @@ import {
 
 type VerificationStep = "phone" | "code";
 type RecaptchaState = "loading" | "ready" | "verified" | "failed";
-type OtpProvider = "loading" | "firebase" | "twilio" | "unavailable";
 
 interface CustomerVerificationState {
   from?: unknown;
@@ -39,6 +39,11 @@ interface CustomerVerificationState {
 const indianMobileNumber = (value: string): string | undefined => {
   const digits = value.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
   return /^[6-9]\d{9}$/.test(digits) ? `+91${digits}` : undefined;
+};
+
+const fictionalTestPhoneNumber = (value: string): string | undefined => {
+  const normalized = value.replace(/[\s()-]/g, "");
+  return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized : undefined;
 };
 
 const remainingLabel = (seconds: number) => `Resend in ${seconds}s`;
@@ -61,20 +66,21 @@ export const CustomerVerificationPage = () => {
   const recaptchaContainer = useRef<HTMLDivElement>(null);
   const otpDialog = useRef<HTMLDialogElement>(null);
   const otpInput = useRef<HTMLInputElement>(null);
-  const phone = useMemo(() => indianMobileNumber(mobileInput), [mobileInput]);
+  const phone = useMemo(
+    () => firebasePhoneTestMode ? fictionalTestPhoneNumber(mobileInput) : indianMobileNumber(mobileInput),
+    [mobileInput],
+  );
   const phoneEnding = phone?.slice(-4) ?? "";
-  const maskedPhone = `+91 ${String.fromCharCode(0x2022).repeat(6)}${phoneEnding}`;
+  const maskedPhone = firebasePhoneTestMode
+    ? `+${String.fromCharCode(0x2022).repeat(Math.max(4, (phone?.length ?? 5) - 5))}${phoneEnding}`
+    : `+91 ${String.fromCharCode(0x2022).repeat(6)}${phoneEnding}`;
   const routeState = location.state as CustomerVerificationState | null;
   const returnTo =
     typeof routeState?.from === "string" && routeState.from.startsWith("/menu")
       ? routeState.from
       : "/menu";
-  const firebaseTestMode = import.meta.env.DEV && new URLSearchParams(location.search).get("firebaseTest") === "1";
-  const [otpProvider, setOtpProvider] = useState<OtpProvider>(firebaseTestMode ? "firebase" : "loading");
-  const requiresRecaptcha = otpProvider === "firebase";
-  const phoneAuthAvailable = apiIsConfigured && (
-    otpProvider === "twilio" || (otpProvider === "firebase" && firebasePhoneAuthConfigured)
-  );
+  const phoneAuthAvailable = apiIsConfigured && firebasePhoneAuthConfigured;
+  const requiresSecurityCheck = !firebasePhoneTestMode;
 
   useEffect(() => {
     if (resendAfter <= 0) return;
@@ -86,31 +92,7 @@ export const CustomerVerificationPage = () => {
   }, [resendAfter]);
 
   useEffect(() => {
-    let mounted = true;
-    if (!apiIsConfigured) {
-      setOtpProvider("unavailable");
-      return () => { mounted = false; };
-    }
-    if (firebaseTestMode) {
-      setOtpProvider("firebase");
-      return () => { mounted = false; };
-    }
-    setOtpProvider("loading");
-    void api.auth.customerOtpProvider()
-      .then(({ provider }) => {
-        if (mounted) setOtpProvider(provider);
-      })
-      .catch(() => {
-        if (mounted) setOtpProvider("unavailable");
-      });
-    return () => { mounted = false; };
-  }, [firebaseTestMode]);
-
-  useEffect(() => {
-    if (!requiresRecaptcha || !phoneAuthAvailable || step !== "phone" || !recaptchaContainer.current) {
-      clearPhoneRecaptcha();
-      return;
-    }
+    if (!phoneAuthAvailable || step !== "phone" || !recaptchaContainer.current) return;
     let mounted = true;
     setRecaptchaState("loading");
     void renderFirebasePhoneRecaptcha(recaptchaContainer.current, {
@@ -136,7 +118,7 @@ export const CustomerVerificationPage = () => {
       mounted = false;
       clearPhoneRecaptcha();
     };
-  }, [phoneAuthAvailable, recaptchaAttempt, requiresRecaptcha, step]);
+  }, [phoneAuthAvailable, recaptchaAttempt, step]);
 
   useEffect(() => {
     const dialog = otpDialog.current;
@@ -171,22 +153,17 @@ export const CustomerVerificationPage = () => {
     setStep("phone");
     setCode("");
     setStatus("idle");
-    setMessage(requiresRecaptcha ? "Complete the Google security check again, then select Send OTP to request another code." : "");
-    if (requiresRecaptcha) setRecaptchaAttempt((current) => current + 1);
+    setMessage(requiresSecurityCheck ? "Complete the Google security check again, then select Send OTP to request another code." : "");
+    if (requiresSecurityCheck) setRecaptchaAttempt((current) => current + 1);
   };
 
   const requestCode = async () => {
     if (!phone) {
-      setMessage("Enter a valid 10-digit Indian mobile number.");
+      setMessage(firebasePhoneTestMode ? "Enter a fictional test phone number in international format." : "Enter a valid 10-digit Indian mobile number.");
       setStatus("error");
       return;
     }
-    if (!phoneAuthAvailable) {
-      setMessage("Mobile OTP is not configured on this site yet.");
-      setStatus("error");
-      return;
-    }
-    if (requiresRecaptcha && recaptchaState !== "verified") {
+    if (requiresSecurityCheck && recaptchaState !== "verified") {
       setMessage("Complete the Google security check before requesting a code.");
       setStatus("error");
       return;
@@ -194,20 +171,16 @@ export const CustomerVerificationPage = () => {
     setStatus("sending");
     setMessage("");
     try {
-      if (otpProvider === "twilio") {
-        await api.auth.sendCustomerOtp({ phone });
-      } else {
-        confirmation.current = await requestFirebasePhoneCode(phone);
-      }
+      confirmation.current = await requestFirebasePhoneCode(phone);
       setStep("code");
       setCode("");
       setResendAfter(30);
       setStatus("idle");
       setMessage("");
     } catch (error) {
-      setMessage(error instanceof ApiError ? error.message : requiresRecaptcha ? firebasePhoneErrorMessage(error, "send") : "We could not send a code right now. Please try again shortly.");
+      setMessage(error instanceof ApiError ? error.message : firebasePhoneErrorMessage(error, "send"));
       setStatus("error");
-      if (requiresRecaptcha) {
+      if (requiresSecurityCheck) {
         clearPhoneRecaptcha();
         setRecaptchaAttempt((current) => current + 1);
       }
@@ -225,13 +198,14 @@ export const CustomerVerificationPage = () => {
     setStatus("verifying");
     setMessage("");
     try {
-      const result = otpProvider === "twilio"
-        ? await api.auth.verifyCustomerOtp({ phone, code })
-        : await (async () => {
-          if (!confirmation.current) throw new Error("Request a new code before confirming your mobile number.");
-          const firebaseResult = await confirmation.current.confirm(code);
-          return api.auth.verifyCustomerFirebase({ idToken: await firebaseResult.user.getIdToken() });
-        })();
+      if (!confirmation.current)
+        throw new Error(
+          "Request a new code before confirming your mobile number.",
+        );
+      const firebaseResult = await confirmation.current.confirm(code);
+      const result = await api.auth.verifyCustomerFirebase({
+        idToken: await firebaseResult.user.getIdToken(),
+      });
       setAccessToken(result.accessToken);
       login("CUSTOMER", result.user.name, result.accessToken);
       navigate(returnTo, { replace: true, state: { proceedOrder: true } });
@@ -302,10 +276,12 @@ export const CustomerVerificationPage = () => {
                 ? cart.length
                   ? `Your ${cart.length} ${cart.length === 1 ? "item is" : "items are"} saved. Enter your mobile number to send the order.`
                   : "Choose your dishes first, then use your mobile number to securely place the order."
-                : `Enter the 6-digit SMS code sent to ${maskedPhone}.`}
+                : firebasePhoneTestMode
+                  ? `Enter the configured test code for ${maskedPhone}.`
+                  : `Enter the 6-digit SMS code sent to ${maskedPhone}.`}
             </p>
           </div>
-          {otpProvider === "unavailable" && (
+          {!phoneAuthAvailable && (
             <p className="login-error" role="status">
               <CircleAlert size={17} /> Mobile OTP is not configured on this site yet.
             </p>
@@ -318,9 +294,9 @@ export const CustomerVerificationPage = () => {
               }}
             >
               <label className="form-field">
-                <span>Mobile number</span>
+                <span>{firebasePhoneTestMode ? "Fictional test number" : "Mobile number"}</span>
                 <div className="customer-mobile-input">
-                  <span aria-hidden="true">+91</span>
+                  {!firebasePhoneTestMode && <span aria-hidden="true">+91</span>}
                   <Smartphone size={18} />
                   <input
                     type="tel"
@@ -330,10 +306,10 @@ export const CustomerVerificationPage = () => {
                         event.target.value.replace(/[^0-9+ -]/g, ""),
                       )
                     }
-                    autoComplete="tel-national"
+                    autoComplete={firebasePhoneTestMode ? "tel" : "tel-national"}
                     inputMode="numeric"
-                    maxLength={15}
-                    placeholder="98765 43210"
+                    maxLength={firebasePhoneTestMode ? 16 : 15}
+                    placeholder={firebasePhoneTestMode ? "+1 650 555 3434" : "98765 43210"}
                     aria-describedby="mobile-help"
                     required
                     autoFocus
@@ -341,13 +317,13 @@ export const CustomerVerificationPage = () => {
                 </div>
               </label>
               <p id="mobile-help" className="form-help">
-                {otpProvider === "loading"
-                  ? "Preparing secure SMS delivery..."
-                  : requiresRecaptcha
-                    ? "Complete the Google security check below. Send OTP unlocks when it is complete."
-                    : "We will text a one-time 6-digit code to confirm this order."}
+                {firebasePhoneTestMode
+                  ? "Test mode is active. Use a fictional Firebase test number and its configured 6-digit code. No SMS will be sent."
+                  : "Complete the Google security check below. Send OTP unlocks when it is complete."}
               </p>
-              {requiresRecaptcha && (
+              {firebasePhoneTestMode ? (
+                <div ref={recaptchaContainer} className="customer-recaptcha__test-verifier" aria-hidden="true" />
+              ) : (
                 <section className="customer-recaptcha" aria-labelledby="security-check-title">
                 <div className="customer-recaptcha__heading">
                   <span id="security-check-title"><ShieldCheck size={16} /> Security check</span>
@@ -378,15 +354,13 @@ export const CustomerVerificationPage = () => {
               <button
                 type="submit"
                 className="button button--saffron button--full login-submit"
-                disabled={status === "sending" || !phoneAuthAvailable || (requiresRecaptcha && recaptchaState !== "verified")}
+                disabled={status === "sending" || !phoneAuthAvailable || (requiresSecurityCheck && recaptchaState !== "verified")}
               >
-                {otpProvider === "loading" ? (
-                  "Preparing mobile OTP..."
-                ) : !phoneAuthAvailable ? (
+                {!phoneAuthAvailable ? (
                   "Mobile OTP unavailable"
                 ) : status === "sending" ? (
                   "Sending secure code..."
-                ) : requiresRecaptcha && recaptchaState !== "verified" ? (
+                ) : requiresSecurityCheck && recaptchaState !== "verified" ? (
                   "Complete security check"
                 ) : (
                   <>
@@ -415,7 +389,7 @@ export const CustomerVerificationPage = () => {
         <div className="otp-dialog__content">
           <div className="otp-dialog__top">
             <span className="otp-dialog__badge">
-              <MessageSquareText size={17} /> Code sent
+              <MessageSquareText size={17} /> {firebasePhoneTestMode ? "Test code ready" : "Code sent"}
             </span>
             <button
               type="button"
@@ -428,7 +402,9 @@ export const CustomerVerificationPage = () => {
           </div>
           <h2 id="otp-dialog-title">Enter your 6-digit code</h2>
           <p id="otp-dialog-description">
-            We sent a one-time code to {maskedPhone}. It expires shortly for your security.
+            {firebasePhoneTestMode
+              ? `No SMS was sent. Enter the 6-digit code configured for ${maskedPhone} in Firebase.`
+              : `We sent a one-time code to ${maskedPhone}. It expires shortly for your security.`}
           </p>
             <form onSubmit={verifyCode}>
               <label className="form-field">
@@ -452,7 +428,9 @@ export const CustomerVerificationPage = () => {
                 </div>
               </label>
               <p id="otp-help" className="form-help">
-                For your security, this code expires shortly after it is sent.
+                {firebasePhoneTestMode
+                  ? "This free Firebase test flow only accepts the code configured for this fictional number."
+                  : "For your security, this code expires shortly after it is sent."}
               </p>
               {message && (
                 <p
