@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { forbidden } from "../lib/errors.js";
@@ -9,10 +10,12 @@ import { authContext, requireAuth, requireRole } from "../middleware/auth.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { OrderModel } from "../models/Order.js";
 import { createOrder, findOrderForActor, transitionOrder, transitionOrderItem } from "../services/order.service.js";
+import { createGuestOrder, findGuestOrder } from "../services/guest-order.service.js";
 import { priceOrder } from "../services/pricing.service.js";
 import { getSingleRestaurant } from "../services/restaurant.service.js";
 import {
   createOrderRequestSchema,
+  guestOrderParamsSchema,
   orderItemStatusRequestSchema,
   orderListRequestSchema,
   orderParamsSchema,
@@ -21,6 +24,14 @@ import {
 } from "./schemas.js";
 
 export const ordersRouter = Router();
+
+const guestOrderLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: (_request, response) => response.status(429).json({ success: false, error: { code: "GUEST_ORDER_RATE_LIMITED", message: "Too many order attempts. Please wait a few minutes and try again." } })
+});
 
 ordersRouter.post("/quote", validateRequest(orderQuoteRequestSchema), asyncHandler(async (request, response) => {
   const restaurant = await getSingleRestaurant();
@@ -42,6 +53,16 @@ ordersRouter.post("/quote", validateRequest(orderQuoteRequestSchema), asyncHandl
 ordersRouter.post("/", requireAuth, requireRole("CUSTOMER", "WAITER", "CASHIER"), validateRequest(createOrderRequestSchema), asyncHandler(async (request, response) => {
   const order = await createOrder(authContext(request), request.body as Parameters<typeof createOrder>[1]);
   sendSuccess(response, serializeOrder(order), 201);
+}));
+
+ordersRouter.post("/guest", guestOrderLimiter, validateRequest(createOrderRequestSchema), asyncHandler(async (request, response) => {
+  const { order, trackingToken } = await createGuestOrder(request.body as Parameters<typeof createGuestOrder>[0]);
+  sendSuccess(response, { ...serializeOrder(order), trackingToken }, 201);
+}));
+
+ordersRouter.get("/guest/:id", validateRequest(guestOrderParamsSchema), asyncHandler(async (request, response) => {
+  const order = await findGuestOrder(validatedParam(request, "id"), validatedQuery<{ token: string }>(request).token);
+  sendSuccess(response, serializeOrder(order));
 }));
 
 ordersRouter.get("/", requireAuth, validateRequest(orderListRequestSchema), asyncHandler(async (request, response) => {

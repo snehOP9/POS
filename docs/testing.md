@@ -60,25 +60,23 @@ update, and confirm a forbidden role receives a safe 403 response.
 Never perform a real payment or production refund as a smoke check. Use
 Razorpay test mode and a disposable database.
 
-## Free Firebase phone-auth testing
+## Guest checkout and synchronisation
 
-Use Firebase Authentication's fictional test phone numbers for a no-cost
-customer OTP check. Firebase does not send an SMS, does not consume SMS quota,
-and accepts only the six-digit code configured for that fictional number.
+Guest checkout is intentionally direct: it does not require a customer
+account, mobile number or separate verification screen. In Preview, add a
+dish from the menu, open the tray, send the order to the kitchen, and confirm
+the guest tracking view updates when the Kitchen Preview marks the ticket
+ready. The Playwright suite performs this browser-level flow, including the
+cross-tab guest-to-kitchen update, without using a live API or creating a
+payment.
 
-1. In Firebase Console, open **Authentication > Sign-in method > Phone numbers
-   for testing** and add a fictional E.164 number plus a newly generated
-   six-digit code. Never use a real person's phone number.
-2. Set `VITE_FIREBASE_PHONE_TEST_MODE=true` only in the Vercel **Preview**
-   environment. Do not add it to Production or commit it to an `.env` file.
-3. Open a Preview deployment, enter that fictional number, select **Send OTP**,
-   and enter the configured code. The screen identifies test mode and shows no
-   Google CAPTCHA or SMS claim.
-4. Remove the Preview variable and delete or rotate the fictional number and
-   code after testing.
-
-The Preview flag enables Firebase's test app-verification behavior. It is not
-a live SMS provider and must never be used with real phone numbers.
+For a live smoke check against a seeded disposable database, submit an
+eligible guest order from a table-QR menu URL or a pickup menu flow, then sign
+in as a Kitchen, Waiter or Cashier user in a separate browser session. Confirm
+the new order and its kitchen tickets arrive in the appropriate staff workspace
+and that subsequent staff status changes are reflected in the operational
+views. Do not run this check against a restaurant's production order queue
+unless the restaurant has explicitly scheduled the test.
 
 ## Planned integration coverage
 
@@ -93,7 +91,7 @@ access control, snapshots, and provider-event idempotency.
 
 Add a browser runner such as Playwright for these flows:
 
-1. Customer pickup from menu through verified test payment and kitchen-ready
+1. Direct guest pickup from menu through test payment and kitchen-ready
    update.
 2. Dine-in table context, waiter/kitchen updates, service, and settlement.
 3. Waiter second round, ensuring only newly sent items reach the next ticket.

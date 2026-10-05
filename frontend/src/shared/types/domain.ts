@@ -149,6 +149,7 @@ export interface Order {
   paymentStatus: PaymentStatus;
   createdAt: string;
   customerName?: string;
+  guestTrackingToken?: string;
   total: number;
   items: OrderItem[];
 }

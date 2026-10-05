@@ -16,6 +16,7 @@ const fixtureOrder = (): Order & { _id: Types.ObjectId } => {
     mode: "DINE_IN",
     tableId: new Types.ObjectId(),
     customerId: new Types.ObjectId(),
+    guestTrackingTokenHash: "protected-guest-tracking-token-hash",
     createdByAccountId: new Types.ObjectId(),
     guestName: "Asha",
     guestPhone: "+919999999999",
@@ -41,6 +42,7 @@ test("staff-specific order projections do not expose customer financial data", (
   assert.equal("pricing" in waiter, false);
   assert.equal("paymentStatus" in waiter, false);
   assert.equal("guestPhone" in waiter, false);
+  assert.equal("guestTrackingTokenHash" in cashier, false);
   assert.equal(cashier.paymentStatus, "PAID");
   assert.equal(cashier.pricing.grandTotalPaise, 44625);
 });

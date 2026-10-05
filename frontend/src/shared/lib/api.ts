@@ -142,16 +142,10 @@ export interface LoginPayload {
 
 export type LoginResponse = AuthResponse;
 
-export interface CustomerFirebaseVerifyPayload {
-  idToken: string;
-}
-
 export const api = {
   auth: {
     login: (payload: LoginPayload) =>
       apiRequest<LoginResponse>("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
-    verifyCustomerFirebase: (payload: CustomerFirebaseVerifyPayload) =>
-      apiRequest<LoginResponse>("/auth/customer/firebase/verify", { method: "POST", body: JSON.stringify(payload) }),
     refresh: refreshAccessToken,
     me: () => apiRequest<CurrentUserResponse>("/auth/me"),
     logout,
@@ -180,6 +174,10 @@ export const api = {
     list: () => apiRequest<unknown>("/orders?page=1&limit=100"),
     create: (payload: JsonRecord) =>
       apiRequest<unknown>("/orders", { method: "POST", body: JSON.stringify(payload) }),
+    createGuest: (payload: JsonRecord) =>
+      apiRequest<unknown>("/orders/guest", { method: "POST", body: JSON.stringify(payload) }),
+    getGuest: (orderId: string, trackingToken: string) =>
+      apiRequest<unknown>(`/orders/guest/${orderId}?token=${encodeURIComponent(trackingToken)}`),
     updateStatus: (orderId: string, status: string) =>
       apiRequest<unknown>(`/orders/${orderId}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
     updateItem: (orderId: string, lineId: string, status: string) =>

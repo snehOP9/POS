@@ -23,12 +23,6 @@ export const loginRequestSchema = z.object({
 export const refreshRequestSchema = z.object({ body: optionalBlank, params: blank, query: blank });
 export const logoutRequestSchema = z.object({ body: optionalBlank, params: blank, query: blank });
 
-export const customerFirebaseVerifySchema = z.object({
-  body: z.object({ idToken: z.string().trim().min(100).max(20_000) }).strict(),
-  params: blank,
-  query: blank
-});
-
 export const menuQuerySchema = z.object({
   body: optionalBlank,
   params: blank,
@@ -179,6 +173,11 @@ export const orderListRequestSchema = z.object({
 });
 
 export const orderParamsSchema = z.object({ body: optionalBlank, params: z.object({ id: objectIdSchema }), query: blank });
+export const guestOrderParamsSchema = z.object({
+  body: optionalBlank,
+  params: z.object({ id: objectIdSchema }),
+  query: z.object({ token: z.string().trim().min(32).max(200) }).strict()
+});
 
 export const orderStatusRequestSchema = z.object({
   body: z.object({

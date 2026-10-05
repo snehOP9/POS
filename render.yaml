@@ -30,5 +30,3 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
-      - key: FIREBASE_PROJECT_ID
-        value: restpos-f145a

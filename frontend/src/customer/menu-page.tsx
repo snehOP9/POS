@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Clock3, Flame, Heart, MapPin, Search, ShoppingBag, Sparkles, Star, UtensilsCrossed, X } from "lucide-react";
 import { Brand } from "@/shared/components/brand";
 import { CartDrawer } from "@/customer/cart-drawer";
-import { ConnectionBadge } from "@/shared/components/connection-badge";
 import { FoodVisual } from "@/shared/components/food-visual";
 import { QuantityControl } from "@/shared/components/quantity-control";
 import { StatusPill } from "@/shared/components/status-pill";
-import { useLiveUpdates } from "@/shared/hooks/useLiveUpdates";
 import { useDialogFocus } from "@/shared/hooks/useDialogFocus";
 import { requiresConfiguration } from "@/shared/components/item-configurator";
 import { formatMoney } from "@/shared/lib/format";
@@ -14,7 +12,7 @@ import { usePos } from "@/shared/store/pos-store";
 import { selectionForOption, unitPriceForSelection } from "@/shared/lib/cart";
 import type { MenuItem } from "@/shared/types/domain";
 import { isActiveOrder } from "@/shared/lib/order-state";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { PublicFooter } from "@/public/public-pages";
 
 const spiceLabel = (level = 0) => level >= 3 ? "Hot" : level === 2 ? "Medium" : "Mild";
@@ -82,8 +80,7 @@ const DishDialog = ({ item, onClose }: { item: MenuItem; onClose: () => void }) 
 };
 
 export const MenuPage = () => {
-  const { cart, setCartOpen, placeOrder, cartMode, setCartMode, orders, menu: items, menuLoading, menuError, refreshMenu, refreshOperations, demoMode, session, notify } = usePos();
-  const navigate = useNavigate();
+  const { cart, setCartOpen, placeOrder, cartMode, setCartMode, orders, menu: items, menuLoading, menuError, refreshMenu, demoMode, notify } = usePos();
   const location = useLocation();
   const tableToken = useMemo(() => {
     const query = new URLSearchParams(location.search);
@@ -97,11 +94,6 @@ export const MenuPage = () => {
   const [spicyOnly, setSpicyOnly] = useState(false);
   const [menuLimit, setMenuLimit] = useState(12);
   const [selectedDish, setSelectedDish] = useState<MenuItem>();
-  const automaticCheckout = useRef<string>();
-  const live = useLiveUpdates((events) => {
-    if (events.has("menu:updated") || events.has("connection:restored")) refreshMenu();
-    if ([...events].some((event) => event !== "menu:updated")) refreshOperations();
-  }, !demoMode && Boolean(session?.accessToken));
   useEffect(() => {
     refreshMenu();
   }, [refreshMenu]);
@@ -118,15 +110,6 @@ export const MenuPage = () => {
   useEffect(() => {
     if (!dineInAvailable && cartMode === "DINE_IN") setCartMode("PICKUP");
   }, [cartMode, dineInAvailable, setCartMode]);
-
-  useEffect(() => {
-    const state = location.state as { proceedOrder?: unknown } | null;
-    if (state?.proceedOrder !== true || !session || session.role !== "CUSTOMER" || !cart.length || (cartMode === "DINE_IN" && !dineInAvailable)) return;
-    if (automaticCheckout.current === location.key) return;
-    automaticCheckout.current = location.key;
-    navigate(`${location.pathname}${location.search}${location.hash}`, { replace: true, state: null });
-    placeOrder("customer", "UNPAID", undefined, undefined, undefined, tableToken);
-  }, [cart.length, cartMode, dineInAvailable, location.hash, location.key, location.pathname, location.search, location.state, navigate, placeOrder, session, tableToken]);
 
   const visibleItems = useMemo(() => items.filter((item) => {
     const matchesCategory = activeCategory === "All" || item.category === activeCategory;
@@ -153,7 +136,7 @@ export const MenuPage = () => {
   const count = cart.reduce((sum, line) => sum + line.quantity, 0);
 
   return <><main className="customer-page">
-    <header className="customer-nav"><Brand /><nav aria-label="Customer navigation"><a href="#menu-list">Menu</a>{latestOrder && <a href="#tracking">Order status</a>}</nav><div className="customer-nav__actions">{(demoMode || session?.accessToken) && <ConnectionBadge live={live} />}<button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
+    <header className="customer-nav"><Brand /><nav aria-label="Customer navigation"><a href="#menu-list">Menu</a>{latestOrder && <a href="#tracking">Order status</a>}</nav><div className="customer-nav__actions"><button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
 
     <section className="menu-hero">
       <div className="menu-hero__copy"><span className="hero-kicker"><span>A brighter kind of dining</span><Sparkles size={14} aria-hidden="true" /></span><h1>Bold flavours,<br /><em>served slow enough</em><br />to remember.</h1><p>Seasonal Indian plates, grilled over flame and brought to your table with care.</p><a className="button button--charcoal" href="#menu-list">Explore today’s menu <ChevronRight size={17} /></a><div className="hero-context"><span><MapPin size={16} /> {dineInAvailable ? "Table ordering is available for this visit" : "Pickup ordering is available"}</span><span><Clock3 size={16} /> Availability is confirmed at checkout</span></div></div>
@@ -171,18 +154,7 @@ export const MenuPage = () => {
     {count > 0 && <button className="mobile-cart-bar" type="button" onClick={() => setCartOpen(true)}><ShoppingBag size={19} /><span>{count} {count === 1 ? "item" : "items"}</span><strong>View tray</strong></button>}
     <CartDrawer
       checkoutLabel={cartMode === "DINE_IN" ? "Send to kitchen" : "Place pickup order"}
-      onCheckout={() => {
-        if (!session || session.role !== "CUSTOMER") {
-          const firebaseTestSearch = import.meta.env.DEV && new URLSearchParams(location.search).get("firebaseTest") === "1"
-            ? "?firebaseTest=1"
-            : "";
-          navigate(`/customer/verify${firebaseTestSearch}`, {
-            state: { from: `${location.pathname}${location.search}${location.hash}` },
-          });
-          return;
-        }
-        placeOrder("customer", "UNPAID", undefined, undefined, undefined, tableToken);
-      }}
+      onCheckout={() => placeOrder("customer", "UNPAID", undefined, undefined, undefined, tableToken)}
     />
     {selectedDish && <DishDialog item={selectedDish} onClose={() => setSelectedDish(undefined)} />}
   </main><PublicFooter /></>;

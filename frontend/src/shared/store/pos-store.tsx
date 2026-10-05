@@ -34,6 +34,8 @@ import { calculateCartPricing, cartLineLabels, cartLineTotal, cartLineUnitPrice,
 const cartStorageKey = "emberserve.customer-cart:v2";
 const previewCartStorageKey = "emberserve.preview-customer-cart:v1";
 const legacyCartStorageKey = "emberserve.customer-cart";
+const guestOrderTrackingStorageKey = "emberserve.guest-order-tracking:v1";
+type GuestOrderTracking = Record<string, string>;
 const developmentGuestPreview = import.meta.env.DEV
   && typeof window !== "undefined"
   && new URLSearchParams(window.location.search).get("preview") === "1";
@@ -79,6 +81,28 @@ const readStoredCart = (preview = false): CartLine[] => {
   }
 };
 
+const readGuestOrderTracking = (): GuestOrderTracking => {
+  try {
+    const stored = sessionStorage.getItem(guestOrderTrackingStorageKey);
+    if (!stored) return {};
+    const parsed: unknown = JSON.parse(stored);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([orderId, token]) =>
+      orderId.length > 0 && typeof token === "string" && token.length >= 32 && token.length <= 200,
+    ));
+  } catch {
+    return {};
+  }
+};
+
+const writeGuestOrderTracking = (tracking: GuestOrderTracking) => {
+  try {
+    sessionStorage.setItem(guestOrderTrackingStorageKey, JSON.stringify(tracking));
+  } catch {
+    // Status tracking remains available for the current page when storage is unavailable.
+  }
+};
+
 const ticketStatusFromItems = (items: OrderItem[]): KitchenTicket["status"] => {
   if (items.every((item) => item.status === "READY")) return "ready";
   if (items.some((item) => item.status === "PREPARING" || item.status === "READY")) return "preparing";
@@ -104,6 +128,12 @@ const readResponseId = (value: unknown): string | undefined => {
     if (typeof orderRecord._id === "string") return orderRecord._id;
   }
   return undefined;
+};
+
+const readGuestTrackingToken = (value: unknown): string | undefined => {
+  if (typeof value !== "object" || value === null) return undefined;
+  const token = (value as Record<string, unknown>).trackingToken;
+  return typeof token === "string" && token.length >= 32 && token.length <= 200 ? token : undefined;
 };
 
 interface PosStore {
@@ -168,6 +198,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const [menuError, setMenuError] = useState<string>();
   const [tables, setTables] = useState<DiningTable[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [guestOrderTracking, setGuestOrderTracking] = useState<GuestOrderTracking>(() => readGuestOrderTracking());
   const [tickets, setTickets] = useState<KitchenTicket[]>([]);
   const [selectedTableId, setSelectedTableId] = useState("t3");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -327,9 +358,60 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     });
   }, [demoMode, notify, session]);
 
+  const rememberGuestOrder = useCallback((orderId: string, trackingToken: string) => {
+    setGuestOrderTracking((current) => {
+      if (current[orderId] === trackingToken) return current;
+      const next = { ...current, [orderId]: trackingToken };
+      writeGuestOrderTracking(next);
+      return next;
+    });
+  }, []);
+
+  const refreshGuestOrders = useCallback(() => {
+    if (demoMode || !Object.keys(guestOrderTracking).length) return;
+    const trackingEntries = Object.entries(guestOrderTracking);
+    const tableLabels = new Map(tables.map((candidate) => [candidate.id, candidate.label]));
+    void Promise.all(trackingEntries.map(async ([orderId, token]) => {
+      try {
+        return { orderId, token, payload: await api.orders.getGuest(orderId, token) };
+      } catch (error) {
+        return { orderId, token, error };
+      }
+    })).then((results) => {
+      const staleIds = results.flatMap((result) => result.error instanceof ApiError && (result.error.status === 401 || result.error.status === 404) ? [result.orderId] : []);
+      if (staleIds.length) {
+        setGuestOrderTracking((current) => {
+          const next = { ...current };
+          for (const orderId of staleIds) delete next[orderId];
+          writeGuestOrderTracking(next);
+          return next;
+        });
+      }
+      const refreshed = results.flatMap((result) => {
+        if (!("payload" in result)) return [];
+        const order = normalizeOrders([result.payload], tableLabels)[0];
+        return order ? [{ ...order, guestTrackingToken: result.token }] : [];
+      });
+      if (!refreshed.length) return;
+      setOrders((current) => {
+        const byId = new Map(refreshed.map((order) => [order.id, order]));
+        const updated = current.map((order) => byId.get(order.id) ?? order);
+        const knownIds = new Set(updated.map((order) => order.id));
+        return [...updated, ...refreshed.filter((order) => !knownIds.has(order.id))];
+      });
+    });
+  }, [demoMode, guestOrderTracking, tables]);
+
   useEffect(() => {
     refreshOperations();
   }, [refreshOperations]);
+
+  useEffect(() => {
+    if (demoMode || !Object.keys(guestOrderTracking).length) return;
+    refreshGuestOrders();
+    const interval = window.setInterval(refreshGuestOrders, 7_500);
+    return () => window.clearInterval(interval);
+  }, [demoMode, guestOrderTracking, refreshGuestOrders]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -606,11 +688,15 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       ? api.waiter.createOrder(table.id, { ...requestPayload, tableId: undefined })
       : source === "cashier"
         ? api.cashier.createOrder(requestPayload)
-        : api.orders.create(requestPayload)).then(async (persisted) => {
+        : api.orders.createGuest(requestPayload)).then(async (persisted) => {
       const persistedId = readResponseId(persisted) ?? createdOrder.id;
+      const trackingToken = source === "customer" ? readGuestTrackingToken(persisted) : undefined;
+      if (trackingToken) rememberGuestOrder(persistedId, trackingToken);
       const tableLabels = new Map(tables.map((candidate) => [candidate.id, candidate.label]));
       const canonical = normalizeOrders([persisted], tableLabels)[0];
-      const persistedOrder = canonical ? { ...createdOrder, ...canonical, id: persistedId } : { ...createdOrder, id: persistedId };
+      const persistedOrder = canonical
+        ? { ...createdOrder, ...canonical, id: persistedId, ...(trackingToken ? { guestTrackingToken: trackingToken } : {}) }
+        : { ...createdOrder, id: persistedId, ...(trackingToken ? { guestTrackingToken: trackingToken } : {}) };
       if (payment !== "PAID") {
         commitOrder(persistedOrder, `${persistedOrder.displayId} is with the kitchen.`);
         return;
@@ -630,7 +716,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       const message = error instanceof ApiError ? error.message : "The API is unavailable. Your order has not been created.";
       notify(message, "danger");
     }).finally(() => finishOperation(operation));
-  }, [cart, cartMode, demoMode, finishOperation, notify, orders.length, pricing, refreshOperations, selectedTableId, startOperation, tables]);
+  }, [cart, cartMode, demoMode, finishOperation, notify, orders.length, pricing, refreshOperations, rememberGuestOrder, selectedTableId, startOperation, tables]);
 
   const startTicket = useCallback((ticketId: string) => {
     const ticket = tickets.find((candidate) => candidate.id === ticketId);

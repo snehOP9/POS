@@ -63,6 +63,7 @@ export interface Order {
   tableId?: Types.ObjectId;
   tableSessionId?: Types.ObjectId;
   customerId?: Types.ObjectId;
+  guestTrackingTokenHash?: string;
   createdByAccountId: Types.ObjectId;
   guestName?: string;
   guestPhone?: string;
@@ -145,6 +146,7 @@ const orderSchema = new Schema<Order>(
     tableId: { type: Schema.Types.ObjectId, ref: "DiningTable", index: true },
     tableSessionId: { type: Schema.Types.ObjectId, ref: "TableSession", index: true },
     customerId: { type: Schema.Types.ObjectId, ref: "Account", index: true },
+    guestTrackingTokenHash: { type: String, select: false },
     createdByAccountId: { type: Schema.Types.ObjectId, ref: "Account", required: true },
     guestName: { type: String, trim: true, maxlength: 100 },
     guestPhone: { type: String, trim: true, maxlength: 30 },

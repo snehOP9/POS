@@ -81,7 +81,7 @@ test("preview guest never contacts a live API or socket", async ({ page }) => {
   });
 
   await enterPreview(page, "Guest");
-  await expect(page.getByText("Preview sync")).toBeVisible();
+  await expect(page.getByText("Preview menu")).toBeVisible();
   await page.waitForTimeout(300);
   expect(liveRequests).toEqual([]);
 });
