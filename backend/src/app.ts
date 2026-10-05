@@ -18,6 +18,8 @@ import { notificationsRouter } from "./routes/notifications.routes.js";
 import { ordersRouter } from "./routes/orders.routes.js";
 import { paymentsRouter, razorpayWebhookHandler } from "./routes/payments.routes.js";
 import { reportsRouter } from "./routes/reports.routes.js";
+import { restaurantRouter } from "./routes/restaurant.routes.js";
+import { reservationsRouter } from "./routes/reservations.routes.js";
 import { shiftsRouter } from "./routes/shifts.routes.js";
 import { tablesRouter } from "./routes/tables.routes.js";
 import { waiterRouter } from "./routes/waiter.routes.js";
@@ -84,6 +86,8 @@ export function createApp() {
   api.use("/cashier", cashierRouter);
   api.use("/shifts", shiftsRouter);
   api.use("/reports", reportsRouter);
+  api.use("/restaurant", restaurantRouter);
+  api.use("/reservations", reservationsRouter);
   api.use("/notifications", notificationsRouter);
   app.use("/api/v1", api);
 

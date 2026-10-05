@@ -34,12 +34,53 @@ export interface RestaurantPricingConfig {
 }
 
 export interface PublicRestaurantInfo {
+  id?: string;
   name: string;
   tagline?: string;
   description?: string;
   phone?: string;
   supportEmail?: string;
   address?: string;
+  currency?: string;
+  timezone?: string;
+  publicProfile?: PublicRestaurantProfile;
+}
+
+export interface RestaurantOpeningHour {
+  day: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+  opens?: string;
+  closes?: string;
+  closed: boolean;
+}
+
+export interface PublicRestaurantProfile {
+  cuisine?: string;
+  story?: string;
+  chefName?: string;
+  chefRole?: string;
+  heroImageUrl?: string;
+  galleryImageUrls: string[];
+  bookingUrl?: string;
+  reservationEnabled: boolean;
+  publicContactEnabled: boolean;
+  openingHours: RestaurantOpeningHour[];
+  parkingNote?: string;
+  accessibilityNote?: string;
+  instagramUrl?: string;
+}
+
+export interface Reservation {
+  id: string;
+  displayId: string;
+  status: "REQUESTED" | "CONFIRMED" | "DECLINED" | "CANCELLED";
+  guestName: string;
+  guestEmail?: string;
+  guestPhone?: string;
+  partySize: number;
+  reservationAt: string;
+  occasion?: string;
+  notes?: string;
+  createdAt?: string;
 }
 
 export interface MenuVariant {
@@ -100,6 +141,7 @@ export interface MenuItem {
   color: string;
   glyph: string;
   tags: string[];
+  allergens?: string[];
   variants?: MenuVariant[];
   modifierGroups?: MenuModifierGroup[];
 }

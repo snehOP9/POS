@@ -132,6 +132,77 @@ export const updateMenuAvailabilityRequestSchema = z.object({
   query: blank
 });
 
+const clockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use 24-hour HH:MM time");
+const openingHourInputSchema = z.object({
+  day: z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]),
+  opens: clockTimeSchema.optional(),
+  closes: clockTimeSchema.optional(),
+  closed: z.boolean().default(false)
+}).strict().superRefine((value, context) => {
+  if (!value.closed && (!value.opens || !value.closes)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["opens"], message: "Opening and closing times are required for an open day" });
+  }
+});
+
+export const restaurantProfileRequestSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(1).max(150),
+    tagline: z.string().trim().max(200).optional(),
+    description: z.string().trim().max(1_000).optional(),
+    phone: z.string().trim().max(30).optional(),
+    supportEmail: z.string().trim().email().max(254).optional().or(z.literal("")),
+    address: z.string().trim().max(500).optional(),
+    publicProfile: z.object({
+      cuisine: z.string().trim().max(120).optional(),
+      story: z.string().trim().max(2_000).optional(),
+      chefName: z.string().trim().max(120).optional(),
+      chefRole: z.string().trim().max(120).optional(),
+      heroImageUrl: z.string().trim().url().max(2_048).optional().or(z.literal("")),
+      galleryImageUrls: z.array(z.string().trim().url().max(2_048)).max(6),
+      bookingUrl: z.string().trim().url().max(2_048).optional().or(z.literal("")),
+      reservationEnabled: z.boolean(),
+      publicContactEnabled: z.boolean(),
+      openingHours: z.array(openingHourInputSchema).length(7),
+      parkingNote: z.string().trim().max(500).optional(),
+      accessibilityNote: z.string().trim().max(500).optional(),
+      instagramUrl: z.string().trim().url().max(2_048).optional().or(z.literal(""))
+    }).strict()
+  }).strict(),
+  params: blank,
+  query: blank
+});
+
+export const createReservationRequestSchema = z.object({
+  body: z.object({
+    guestName: z.string().trim().min(2).max(120),
+    guestEmail: z.string().trim().email().max(254).optional(),
+    guestPhone: z.string().trim().regex(/^\+?[0-9][0-9 -]{5,28}[0-9]$/, "Enter a valid phone number").optional(),
+    partySize: z.number().int().min(1).max(30),
+    reservationAt: z.coerce.date().refine((value) => value.getTime() > Date.now() + 30 * 60 * 1000, "Choose a time at least 30 minutes from now"),
+    occasion: z.string().trim().max(120).optional(),
+    notes: z.string().trim().max(500).optional(),
+    consent: z.literal(true)
+  }).strict().superRefine((value, context) => {
+    if (!value.guestEmail && !value.guestPhone) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["guestEmail"], message: "Provide an email address or phone number" });
+    }
+  }),
+  params: blank,
+  query: blank
+});
+
+export const reservationListRequestSchema = z.object({
+  body: optionalBlank,
+  params: blank,
+  query: paginationQuery.extend({ status: z.enum(["REQUESTED", "CONFIRMED", "DECLINED", "CANCELLED"]).optional() })
+});
+
+export const reservationStatusRequestSchema = z.object({
+  body: z.object({ status: z.enum(["REQUESTED", "CONFIRMED", "DECLINED", "CANCELLED"]) }).strict(),
+  params: z.object({ id: objectIdSchema }),
+  query: blank
+});
+
 const orderLineSchema = z.object({
   menuItemId: objectIdSchema,
   quantity: z.number().int().min(1).max(99),

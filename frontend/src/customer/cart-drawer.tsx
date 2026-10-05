@@ -1,4 +1,5 @@
-import { ArrowRight, ShoppingBag, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ShoppingBag, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { formatMoney } from "@/shared/lib/format";
 import { QuantityControl } from "@/shared/components/quantity-control";
 import { useDialogFocus } from "@/shared/hooks/useDialogFocus";
@@ -7,10 +8,11 @@ import { cartLineLabels, cartLineTotal } from "@/shared/lib/cart";
 
 interface CartDrawerProps {
   checkoutLabel?: string;
-  onCheckout?: () => void;
+  orderMode?: "DINE_IN" | "PICKUP";
+  onCheckout?: (pickup?: { name: string; phone?: string }) => void;
 }
 
-export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout }: CartDrawerProps) => {
+export const CartDrawer = ({ checkoutLabel = "Send order", orderMode = "DINE_IN", onCheckout }: CartDrawerProps) => {
   const {
     cart, cartOpen, setCartOpen, updateLineQuantity, clearCart,
     cartSubtotal, cartTax, cartService, cartTotal, pricing, isPending,
@@ -18,6 +20,13 @@ export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout }: CartDra
   const itemCount = cart.reduce((count, line) => count + line.quantity, 0);
   const drawerRef = useDialogFocus(cartOpen, () => setCartOpen(false));
   const submitting = isPending("order:create:customer");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [pickupName, setPickupName] = useState("");
+  const [pickupPhone, setPickupPhone] = useState("");
+
+  useEffect(() => {
+    if (!cartOpen || !cart.length) setReviewOpen(false);
+  }, [cart.length, cartOpen]);
 
   if (!cartOpen) return null;
   return (
@@ -44,7 +53,12 @@ export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout }: CartDra
             {cartService > 0 && <div><dt>Service</dt><dd>{formatMoney(cartService)}</dd></div>}
             <div className="order-totals__total"><dt>Total</dt><dd>{formatMoney(cartTotal)}</dd></div>
           </dl>
-          <button type="button" className="button button--saffron button--full" onClick={onCheckout} disabled={submitting}><span>{submitting ? "Sending order." : checkoutLabel}</span><ArrowRight size={18} /></button>
+          {reviewOpen ? <div className="cart-review" aria-live="polite">
+            <div><span className="eyebrow">Review before sending</span><strong>{orderMode === "PICKUP" ? "Pickup details" : "Table order"}</strong></div>
+            {orderMode === "PICKUP" ? <><label>Pickup name<input required value={pickupName} onChange={(event) => setPickupName(event.target.value)} maxLength={100} placeholder="Your name" autoComplete="name" /></label><label>Phone <small>optional</small><input value={pickupPhone} onChange={(event) => setPickupPhone(event.target.value)} maxLength={30} inputMode="tel" autoComplete="tel" placeholder="For an order question" /></label></> : <p>Your order is sent only to the table connected to this QR code.</p>}
+            <p className="cart-review__note">Please check your items and total. Payment and pickup readiness are confirmed by the restaurant after submission.</p>
+            <div className="cart-review__actions"><button type="button" className="quiet-button" onClick={() => setReviewOpen(false)} disabled={submitting}><ArrowLeft size={16} /> Edit tray</button><button type="button" className="button button--saffron" onClick={() => onCheckout?.(orderMode === "PICKUP" ? { name: pickupName.trim() || "Guest", phone: pickupPhone.trim() || undefined } : undefined)} disabled={submitting || (orderMode === "PICKUP" && !pickupName.trim())}>{submitting ? "Sending order…" : "Confirm and send"} <ArrowRight size={17} /></button></div>
+          </div> : <button type="button" className="button button--saffron button--full" onClick={() => setReviewOpen(true)} disabled={submitting}><span>{checkoutLabel}</span><ArrowRight size={18} /></button>}
         </div>}
       </aside>
     </div>

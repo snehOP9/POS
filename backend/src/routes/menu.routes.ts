@@ -10,7 +10,7 @@ import { CategoryModel } from "../models/Category.js";
 import { MenuItemModel } from "../models/MenuItem.js";
 import { createNotification } from "../services/notification.service.js";
 import { effectiveBasePricePaise } from "../services/pricing.service.js";
-import { getSingleRestaurant, publicRestaurant } from "../services/restaurant.service.js";
+import { getSingleRestaurant, ownerRestaurant, publicRestaurant } from "../services/restaurant.service.js";
 import { emitToRole } from "../services/socket.service.js";
 import {
   createCategoryRequestSchema,
@@ -105,6 +105,7 @@ menuRouter.get("/manage/catalogue", requireAuth, requireRole("CASHIER"), require
   ]);
   const categoriesById = new Map(categories.map((category) => [category._id.toString(), category]));
   sendSuccess(response, {
+    restaurant: ownerRestaurant(restaurant),
     categories: categories.map((category) => ({ id: category._id.toString(), name: category.name, description: category.description, imageUrl: category.imageUrl, sortOrder: category.sortOrder, visible: category.visible })),
     items: menuItems.map((item) => {
       const category = categoriesById.get(item.categoryId.toString());

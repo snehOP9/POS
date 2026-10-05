@@ -6,10 +6,10 @@ test("public legal, contact, cookie information, and recovery routes are accessi
   for (const width of [320, 375, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/terms");
-    await expect(page).toHaveTitle("Terms of use | EmberServe POS");
+    await expect(page).toHaveTitle("Terms of use | Ember & Grain");
     await expect(page.getByRole("heading", { name: "Terms of Use" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Privacy notice" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Contact and data requests" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Contact" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
   }
 
@@ -22,10 +22,10 @@ test("public legal, contact, cookie information, and recovery routes are accessi
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/privacy$/);
 
   await page.goto("/contact");
-  await expect(page).toHaveTitle("Contact and data requests | EmberServe POS");
-  await expect(page.getByRole("heading", { name: "Contact EmberServe POS" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "snehraunak.in" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "+91 92419 20176" }).first()).toBeVisible();
+  await expect(page).toHaveTitle("Contact | Ember & Grain");
+  await expect(page.getByRole("heading", { name: "Contact the restaurant" })).toBeVisible();
+  await expect(page.getByText("The restaurant has not published a guest contact channel yet.").first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "snehraunak.in" })).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(430);
 
   await page.goto("/not-a-real-route");

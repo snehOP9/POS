@@ -18,7 +18,7 @@ test("guest signatures filter to signature dishes and preserves a compact first 
   await page.setViewportSize({ width: 390, height: 844 });
   await enterPreview(page, "Guest");
   const cards = page.locator(".menu-grid:not(.menu-grid--skeleton) .menu-card");
-  await expect(cards).toHaveCount(12);
+  await expect(cards).toHaveCount(9);
 
   await page.getByRole("button", { name: "Signatures", exact: true }).click();
   await expect(cards).toHaveCount(await page.locator(".featured-ribbon").count());
@@ -31,9 +31,11 @@ test("guest checkout sends an order directly without a verification route", asyn
   await expect(page.locator(".customer-page")).toBeVisible();
   await page.locator(".menu-grid .add-button").first().click();
   await page.getByRole("button", { name: /Open cart/i }).click();
-  await expect(page.getByRole("button", { name: "Send to kitchen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review table order" })).toBeVisible();
   await expect(page.getByLabel(/mobile number/i)).toHaveCount(0);
-  await page.getByRole("button", { name: "Send to kitchen" }).click();
+  await page.getByRole("button", { name: "Review table order" }).click();
+  await expect(page.getByRole("button", { name: "Confirm and send" })).toBeVisible();
+  await page.getByRole("button", { name: "Confirm and send" }).click();
   await expect(page).toHaveURL(/\/menu\?preview=1$/);
   await expect(page.locator(".tracking-strip")).toContainText("Confirmed");
 });

@@ -33,7 +33,15 @@ async function seed(): Promise<void> {
         orderingModes: ["DINE_IN", "PICKUP", "COUNTER"],
         deliveryEnabled: false,
         primaryColor: "#F59E0B",
-        secondaryColor: "#1C1917"
+        secondaryColor: "#1C1917",
+        publicProfile: {
+          cuisine: "Modern Indian dining",
+          story: "This demonstration profile is intentionally neutral. A restaurant owner can publish its own story, chef, images, opening hours, booking link and verified contact details from the cashier settings.",
+          galleryImageUrls: [],
+          reservationEnabled: true,
+          publicContactEnabled: false,
+          openingHours: []
+        }
       }
     },
     { new: true, upsert: true, setDefaultsOnInsert: true }
@@ -120,7 +128,7 @@ async function seed(): Promise<void> {
   const menuSpecs = [...coreMenuSpecs, ...expandedCatalogue(pexels)];
   await Promise.all(menuSpecs.map((spec) => MenuItemModel.findOneAndUpdate(
     { restaurantId: restaurant._id, name: spec.name },
-    { $set: { ...spec, categoryId: categoryId(spec.category), available: true, archived: false, allergens: [], spiceLevel: 1 } },
+    { $set: { ...spec, categoryId: categoryId(spec.category), available: true, archived: false, allergens: [], spiceLevel: "spiceLevel" in spec ? spec.spiceLevel : 0 } },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   )));
 

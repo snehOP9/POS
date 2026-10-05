@@ -170,6 +170,18 @@ export const api = {
     setAvailability: (itemId: string, available: boolean) =>
       apiRequest<unknown>(`/menu/items/${itemId}/availability`, { method: "PATCH", body: JSON.stringify({ available }) }),
   },
+  restaurant: {
+    getProfile: () => apiRequest<unknown>("/restaurant/profile"),
+    updateProfile: (payload: JsonRecord) =>
+      apiRequest<unknown>("/restaurant/profile", { method: "PATCH", body: JSON.stringify(payload) }),
+  },
+  reservations: {
+    create: (payload: JsonRecord) =>
+      apiRequest<unknown>("/reservations", { method: "POST", body: JSON.stringify(payload) }),
+    list: () => apiRequest<unknown>("/reservations?page=1&limit=100"),
+    updateStatus: (reservationId: string, status: string) =>
+      apiRequest<unknown>(`/reservations/${reservationId}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  },
   orders: {
     list: () => apiRequest<unknown>("/orders?page=1&limit=100"),
     create: (payload: JsonRecord) =>

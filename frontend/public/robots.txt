@@ -1,7 +1,5 @@
 User-agent: *
-Allow: /menu
-Allow: /privacy
-Allow: /terms
+Allow: /
 Disallow: /cashier
 Disallow: /waiter
 Disallow: /kitchen

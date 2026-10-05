@@ -15,12 +15,17 @@ const KitchenPage = lazy(async () => ({ default: (await import("@/kitchen/kitche
 const LoginPage = lazy(async () => ({ default: (await import("@/auth/login-page")).LoginPage }));
 const AccessPage = lazy(async () => ({ default: (await import("@/public/access-page")).AccessPage }));
 const LegalPage = lazy(async () => ({ default: (await import("@/public/public-pages")).LegalPage }));
+const RestaurantHomePage = lazy(async () => ({ default: (await import("@/public/restaurant-site")).RestaurantHomePage }));
+const StoryPage = lazy(async () => ({ default: (await import("@/public/restaurant-site")).StoryPage }));
+const VisitPage = lazy(async () => ({ default: (await import("@/public/restaurant-site")).VisitPage }));
+const ReservationPage = lazy(async () => ({ default: (await import("@/public/restaurant-site")).ReservationPage }));
 
 const TitleUpdater = () => {
   const location = useLocation();
+  const { restaurant } = usePos();
   useEffect(() => {
-    updateDocumentMetadata(location.pathname);
-  }, [location.pathname]);
+    updateDocumentMetadata(location.pathname, restaurant);
+  }, [location.pathname, restaurant]);
   return null;
 };
 
@@ -53,9 +58,12 @@ export const App = () => <BrowserRouter>
     <TitleUpdater />
     <Suspense fallback={<RouteLoader />}>
       <Routes>
-        <Route path="/" element={<AccessPage />} />
+        <Route path="/" element={<RestaurantHomePage />} />
         <Route path="/access" element={<AccessPage />} />
         <Route path="/menu" element={<MenuPage />} />
+        <Route path="/story" element={<StoryPage />} />
+        <Route path="/visit" element={<VisitPage />} />
+        <Route path="/reservations" element={<ReservationPage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
         <Route path="/terms" element={<LegalPage kind="terms" />} />
         <Route path="/contact" element={<LegalPage kind="contact" />} />
