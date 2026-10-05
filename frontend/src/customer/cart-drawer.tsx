@@ -13,12 +13,11 @@ interface CartDrawerProps {
 export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout }: CartDrawerProps) => {
   const {
     cart, cartOpen, setCartOpen, updateLineQuantity, clearCart,
-    cartSubtotal, cartTax, cartService, cartTotal, pricing, isPending, session,
+    cartSubtotal, cartTax, cartService, cartTotal, pricing, isPending,
   } = usePos();
   const itemCount = cart.reduce((count, line) => count + line.quantity, 0);
   const drawerRef = useDialogFocus(cartOpen, () => setCartOpen(false));
   const submitting = isPending("order:create:customer");
-  const requiresMobileVerification = !session || session.role !== "CUSTOMER";
 
   if (!cartOpen) return null;
   return (
@@ -45,8 +44,7 @@ export const CartDrawer = ({ checkoutLabel = "Send order", onCheckout }: CartDra
             {cartService > 0 && <div><dt>Service</dt><dd>{formatMoney(cartService)}</dd></div>}
             <div className="order-totals__total"><dt>Total</dt><dd>{formatMoney(cartTotal)}</dd></div>
           </dl>
-          {requiresMobileVerification && <p className="cart-auth-note">Your tray is saved. Confirm your mobile number by SMS, then we will send this order to the kitchen.</p>}
-          <button type="button" className="button button--saffron button--full" onClick={onCheckout} disabled={submitting}><span>{submitting ? "Sending order." : requiresMobileVerification ? "Verify mobile to continue" : checkoutLabel}</span><ArrowRight size={18} /></button>
+          <button type="button" className="button button--saffron button--full" onClick={onCheckout} disabled={submitting}><span>{submitting ? "Sending order." : checkoutLabel}</span><ArrowRight size={18} /></button>
         </div>}
       </aside>
     </div>

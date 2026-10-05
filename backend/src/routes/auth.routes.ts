@@ -1,18 +1,15 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
 
 import { env } from "../config/env.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { conflict, unauthorized } from "../lib/errors.js";
+import { unauthorized } from "../lib/errors.js";
 import { sendSuccess } from "../lib/response.js";
 import { requireAuth, authContext } from "../middleware/auth.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { AccountModel } from "../models/Account.js";
 import { issueTokens, passwordMatches, publicAccount, verifyToken, hashPassword } from "../services/auth.service.js";
-import { guestAccountEmail, guestAccountPassword, verifyCustomerFirebaseIdToken } from "../services/customer-otp.service.js";
-import { getSingleRestaurant } from "../services/restaurant.service.js";
 import { disconnectAccountSockets } from "../services/socket.service.js";
-import { customerFirebaseVerifySchema, loginRequestSchema, logoutRequestSchema, refreshRequestSchema } from "./schemas.js";
+import { loginRequestSchema, logoutRequestSchema, refreshRequestSchema } from "./schemas.js";
 
 const refreshCookieName = "emberserve_refresh";
 
@@ -39,14 +36,6 @@ function userPayload(account: Parameters<typeof publicAccount>[0]) {
 
 export const authRouter = Router();
 
-const customerOtpVerifyLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: (_request, response) => response.status(429).json({ success: false, error: { code: "OTP_RATE_LIMITED", message: "Too many verification attempts. Please request a new code and try again later." } })
-});
-
 authRouter.post("/login", validateRequest(loginRequestSchema), asyncHandler(async (request, response) => {
   const { email, password } = request.body as { email: string; password: string };
   const account = await AccountModel.findOne({ email: email.toLowerCase() }).select("+passwordHash +refreshTokenHash +tokenVersion");
@@ -54,44 +43,8 @@ authRouter.post("/login", validateRequest(loginRequestSchema), asyncHandler(asyn
     throw unauthorized("AUTH_INVALID_CREDENTIALS", "Email or password is incorrect");
   }
   if (account.role === "CUSTOMER") {
-    throw unauthorized("CUSTOMER_MOBILE_VERIFICATION_REQUIRED", "Guest access uses mobile verification. Return to the menu to confirm your mobile number.");
+    throw unauthorized("CUSTOMER_GUEST_ACCESS_ONLY", "Guest ordering is available directly from the menu.");
   }
-  const tokens = issueTokens(account);
-  account.refreshTokenHash = await hashPassword(tokens.refreshToken);
-  await account.save();
-  response.cookie(refreshCookieName, tokens.refreshToken, refreshCookieOptions());
-  sendSuccess(response, { accessToken: tokens.accessToken, user: userPayload(account) });
-}));
-
-authRouter.post("/customer/firebase/verify", customerOtpVerifyLimiter, validateRequest(customerFirebaseVerifySchema), asyncHandler(async (request, response) => {
-  const { idToken } = request.body as { idToken: string };
-  const phone = await verifyCustomerFirebaseIdToken(idToken);
-
-  const restaurant = await getSingleRestaurant();
-  let account = await AccountModel.findOne({ restaurantId: restaurant._id, phone }).select("+passwordHash +refreshTokenHash +tokenVersion");
-  if (account && account.role !== "CUSTOMER") {
-    throw conflict("MOBILE_ACCOUNT_CONFLICT", "This mobile number cannot be used for guest ordering. Please contact the restaurant.");
-  }
-  if (!account) {
-    try {
-      account = await AccountModel.create({
-        restaurantId: restaurant._id,
-        email: guestAccountEmail(phone),
-        phone,
-        displayName: "Guest",
-        passwordHash: await hashPassword(guestAccountPassword()),
-        role: "CUSTOMER",
-        permissions: [],
-        active: true
-      });
-    } catch (error: unknown) {
-      const duplicateKeyError = error as { code?: unknown };
-      if (duplicateKeyError.code !== 11000) throw error;
-      account = await AccountModel.findOne({ restaurantId: restaurant._id, phone }).select("+passwordHash +refreshTokenHash +tokenVersion");
-      if (!account || account.role !== "CUSTOMER") throw error;
-    }
-  }
-  if (!account.active) throw unauthorized("AUTH_SESSION_REVOKED", "This guest account is no longer active");
   const tokens = issueTokens(account);
   account.refreshTokenHash = await hashPassword(tokens.refreshToken);
   await account.save();

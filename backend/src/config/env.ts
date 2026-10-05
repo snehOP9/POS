@@ -12,11 +12,6 @@ const booleanFromEnvironment = z
   .enum(["true", "false"])
   .transform((value) => value === "true");
 
-const optionalSecret = z.preprocess(
-  (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
-  z.string().trim().min(1).optional()
-);
-
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
@@ -31,7 +26,6 @@ const environmentSchema = z.object({
   RAZORPAY_KEY_ID: z.string().min(1).optional(),
   RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
-  FIREBASE_PROJECT_ID: optionalSecret,
   COOKIE_DOMAIN: z.string().trim().min(1).optional(),
   COOKIE_SECURE: booleanFromEnvironment.optional(),
   TRUST_PROXY: booleanFromEnvironment.optional().default("false"),
