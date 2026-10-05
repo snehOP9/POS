@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, Clock3, Flame, Heart, MapPin, Search, ShoppingBag, Sparkles, Star, UtensilsCrossed, X } from "lucide-react";
+import { ChevronRight, Clock3, Flame, Heart, MapPin, Search, ShoppingBag, Sparkles, Star, UserRound, UtensilsCrossed, X } from "lucide-react";
 import { Brand } from "@/shared/components/brand";
 import { CartDrawer } from "@/customer/cart-drawer";
 import { FoodVisual } from "@/shared/components/food-visual";
@@ -12,7 +12,7 @@ import { usePos } from "@/shared/store/pos-store";
 import { selectionForOption, unitPriceForSelection } from "@/shared/lib/cart";
 import type { MenuItem } from "@/shared/types/domain";
 import { isActiveOrder } from "@/shared/lib/order-state";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { PublicFooter } from "@/public/public-pages";
 
 const spiceLabel = (level = 0) => level >= 3 ? "Hot" : level === 2 ? "Medium" : "Mild";
@@ -136,7 +136,7 @@ export const MenuPage = () => {
   const count = cart.reduce((sum, line) => sum + line.quantity, 0);
 
   return <><main className="customer-page">
-    <header className="customer-nav"><Brand /><nav aria-label="Customer navigation"><a href="#menu-list">Menu</a>{latestOrder && <a href="#tracking">Order status</a>}</nav><div className="customer-nav__actions"><button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
+    <header className="customer-nav"><Brand /><nav aria-label="Customer navigation"><a href="#menu-list">Menu</a>{latestOrder && <a href="#tracking">Order status</a>}<Link to="/access">Profiles</Link></nav><div className="customer-nav__actions"><Link className="customer-access-link" to="/access" aria-label="Open profiles and staff access"><UserRound size={17} /><span>Profiles</span></Link><button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
 
     <section className="menu-hero">
       <div className="menu-hero__copy"><span className="hero-kicker"><span>A brighter kind of dining</span><Sparkles size={14} aria-hidden="true" /></span><h1>Bold flavours,<br /><em>served slow enough</em><br />to remember.</h1><p>Seasonal Indian plates, grilled over flame and brought to your table with care.</p><a className="button button--charcoal" href="#menu-list">Explore today’s menu <ChevronRight size={17} /></a><div className="hero-context"><span><MapPin size={16} /> {dineInAvailable ? "Table ordering is available for this visit" : "Pickup ordering is available"}</span><span><Clock3 size={16} /> Availability is confirmed at checkout</span></div></div>

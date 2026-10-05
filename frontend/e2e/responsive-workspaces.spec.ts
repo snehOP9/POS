@@ -48,3 +48,30 @@ test("every preview workspace fits compact phones, tablets, and desktop", async 
     }
   }
 });
+
+test("profile choices remain discoverable on phones and tablets", async ({ page }) => {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 768, height: 1024 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/access");
+    await expect(page.getByRole("heading", { name: "Where are you headed?" })).toBeVisible();
+    await expect(page.locator(".access-profile")).toHaveCount(4);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+
+    await page.locator(".access-profile", { hasText: "Kitchen" }).click();
+    await expect(page).toHaveURL(/\/staff\/login\?role=KITCHEN$/);
+    await expect(page.getByRole("radio", { name: "Kitchen" })).toHaveAttribute("aria-checked", "true");
+  }
+});
+
+test("staff profiles are available from every phone workspace", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const role of ["Cashier", "Waiter", "Kitchen"] as const) {
+    await enterPreview(page, role);
+    const profile = page.getByRole("button", { name: new RegExp(`Preview ${role}, ${role} profile`, "i") }).first();
+    await expect(profile).toBeVisible();
+    await profile.click();
+    await expect(page.getByRole("dialog", { name: `Preview ${role}` })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Switch profile" })).toBeVisible();
+    await page.getByRole("button", { name: "Close profile menu" }).click();
+  }
+});
