@@ -13,6 +13,7 @@ const CashierPage = lazy(async () => ({ default: (await import("@/cashier/cashie
 const WaiterPage = lazy(async () => ({ default: (await import("@/waiter/waiter-page")).WaiterPage }));
 const KitchenPage = lazy(async () => ({ default: (await import("@/kitchen/kitchen-page")).KitchenPage }));
 const LoginPage = lazy(async () => ({ default: (await import("@/auth/login-page")).LoginPage }));
+const AccessPage = lazy(async () => ({ default: (await import("@/public/access-page")).AccessPage }));
 const LegalPage = lazy(async () => ({ default: (await import("@/public/public-pages")).LegalPage }));
 
 const TitleUpdater = () => {
@@ -52,7 +53,8 @@ export const App = () => <BrowserRouter>
     <TitleUpdater />
     <Suspense fallback={<RouteLoader />}>
       <Routes>
-        <Route path="/" element={<Navigate to="/menu" replace />} />
+        <Route path="/" element={<AccessPage />} />
+        <Route path="/access" element={<AccessPage />} />
         <Route path="/menu" element={<MenuPage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
         <Route path="/terms" element={<LegalPage kind="terms" />} />

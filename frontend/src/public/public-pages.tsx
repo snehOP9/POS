@@ -97,6 +97,7 @@ export const PublicFooter = () => {
     <div className="public-footer__brand"><Brand inverse /><p>Guest ordering and role-protected restaurant operations in one application, with clear information about how the service handles order, staff and support data.</p></div>
     <nav className="public-footer__nav" aria-label="Site information">
       <Link to="/menu">Menu</Link>
+      <Link to="/access">Profiles and staff</Link>
       <Link to="/privacy">Privacy notice</Link>
       <Link to="/terms">Terms of use</Link>
       <Link to="/contact">Contact and data requests</Link>
