@@ -4,6 +4,8 @@ import { BarChart3, Bell, Check, ChevronDown, CircleHelp, Clock3, LayoutGrid, Lo
 import { Brand } from "@/shared/components/brand";
 import { CashierShiftPanel } from "./cashier-shift-panel";
 import { MenuManagementPanel } from "./menu-management-panel";
+import { RestaurantProfilePanel } from "./restaurant-profile-panel";
+import { ReservationManagementPanel } from "./reservation-management-panel";
 import { ConnectionBadge } from "@/shared/components/connection-badge";
 import { StaffProfileMenu } from "@/shared/components/staff-profile-menu";
 import { FoodVisual } from "@/shared/components/food-visual";
@@ -88,7 +90,7 @@ const OrderOperationCard = ({ order, mode, pending, onServe, onTakeCash, onCompl
 export const CashierPage = () => {
   const {
     cart, cartSubtotal, cartTax, cartService, cartTotal, addToCart, updateLineQuantity,
-    clearCart, cartMode, setCartMode, tables, selectedTableId, selectTable, adjustGuests, placeOrder, orders, menu, menuCategories, pricing, demoMode, isPending, refreshMenu, refreshOperations, notify, logout, session, serveOrder, takeCashPayment, completeOrder,
+    clearCart, cartMode, setCartMode, tables, selectedTableId, selectTable, adjustGuests, placeOrder, orders, menu, menuCategories, pricing, restaurant, demoMode, isPending, refreshMenu, refreshOperations, notify, logout, session, serveOrder, takeCashPayment, completeOrder,
   } = usePos();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
@@ -195,7 +197,11 @@ export const CashierPage = () => {
       document.querySelector(".cashier-products")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    if (label === "Orders" || label === "Payments" || label === "Settings") return;
+    if (label === "Orders" || label === "Payments") return;
+    if (label === "Settings") {
+      window.setTimeout(() => document.querySelector(".restaurant-profile-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+      return;
+    }
     if (label === "Shift") return;
     if (label === "Reports") {
       loadReports();
@@ -239,6 +245,8 @@ export const CashierPage = () => {
         </aside>
       </div>
     </section>
+    {activeNav === "Settings" && <RestaurantProfilePanel restaurant={restaurant} demoMode={demoMode} refreshMenu={refreshMenu} notify={notify} />}
+    {activeNav === "Settings" && <ReservationManagementPanel demoMode={demoMode} notify={notify} />}
     {configuringItem && <ItemConfigurator item={configuringItem} onAdd={(selection) => addToCart(configuringItem, selection)} onClose={() => setConfiguringItem(undefined)} submitLabel="Add to bill" />}
   </main>;
 };

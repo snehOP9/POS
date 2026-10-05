@@ -11,7 +11,7 @@ import {
 import { ApiError, api, getAccessToken, setAccessToken } from "@/shared/lib/api";
 import { menuItems as previewMenuItems } from "@/shared/data/demo";
 import { formatMoney } from "@/shared/lib/format";
-import { normalizeMenuCategories, normalizeMenuPayload, normalizeRestaurantPricing } from "@/shared/lib/menu-adapter";
+import { normalizeMenuCategories, normalizeMenuPayload, normalizePublicRestaurant, normalizeRestaurantPricing } from "@/shared/lib/menu-adapter";
 import { normalizeOrders, normalizeTables, normalizeTickets } from "@/shared/lib/operations-adapter";
 import { clearPreviewState, createPreviewChannel, createPreviewOrigin, isNewerPreviewState, previewSeed, readPreviewState, type PreviewRestaurantState, writePreviewState } from "@/shared/lib/preview-state";
 import type {
@@ -27,6 +27,7 @@ import type {
   OrderItem,
   Role,
   RestaurantPricingConfig,
+  PublicRestaurantInfo,
   ToastMessage,
 } from "@/shared/types/domain";
 
@@ -141,6 +142,7 @@ interface PosStore {
   menuCategories: MenuCategory[];
   menuLoading: boolean;
   pricing: RestaurantPricingConfig;
+  restaurant?: PublicRestaurantInfo;
   menuError?: string;
   refreshMenu: () => void;
   refreshOperations: () => void;
@@ -171,7 +173,7 @@ interface PosStore {
   openTableSession: (tableId: string, guestCount: number, note?: string) => void;
   updateTableSession: (tableId: string, guestCount: number, note?: string) => void;
   closeTableSession: (tableId: string) => void;
-  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number, tableToken?: string) => void;
+  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone?: string }, guestCount?: number, tableToken?: string) => void;
   startTicket: (ticketId: string) => void;
   markTicketItemReady: (ticketId: string, itemId: string) => void;
   markTicketReady: (ticketId: string) => void;
@@ -195,6 +197,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [pricing, setPricing] = useState<RestaurantPricingConfig>(fallbackRestaurantPricing);
+  const [restaurant, setRestaurant] = useState<PublicRestaurantInfo>();
   const [menuError, setMenuError] = useState<string>();
   const [tables, setTables] = useState<DiningTable[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -310,6 +313,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       setMenuCategories(categoriesFromMenu(previewMenuItems));
       setMenuError(undefined);
       setPricing(fallbackRestaurantPricing);
+      setRestaurant({ name: "Ember & Grain", tagline: "A guest experience preview", publicProfile: { galleryImageUrls: [], openingHours: [], reservationEnabled: true, publicContactEnabled: false } });
       setMenuLoading(false);
       return;
     }
@@ -321,10 +325,12 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       setMenu(nextMenu);
       setMenuCategories(normalizeMenuCategories(payload));
       setPricing(normalizeRestaurantPricing(payload));
+      setRestaurant(normalizePublicRestaurant(payload));
       if (!nextMenu.length) setMenuError("The restaurant has no available menu items right now.");
     }).catch((error: unknown) => {
       setMenu([]);
       setMenuCategories([]);
+      setRestaurant(undefined);
       setMenuError(error instanceof ApiError ? error.message : "The live menu is temporarily unavailable.");
     }).finally(() => setMenuLoading(false));
   }, [demoMode, session?.role]);
@@ -415,11 +421,6 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!demoMode && !session) {
-      setMenuLoading(false);
-      setMenuError(undefined);
-      return;
-    }
     refreshMenu();
   }, [authLoading, demoMode, refreshMenu, session]);
 
@@ -598,7 +599,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     }).finally(() => finishOperation(operation));
   }, [demoMode, finishOperation, notify, refreshOperations, startOperation, tables]);
 
-  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone: string }, guestCount?: number, tableToken?: string) => {
+  const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone?: string }, guestCount?: number, tableToken?: string) => {
     if (!cart.length) {
       notify("Add something delicious before placing an order.", "danger");
       return;
@@ -924,6 +925,7 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
       setMenu(previewMenuItems);
       setMenuCategories(categoriesFromMenu(previewMenuItems));
       setPricing(fallbackRestaurantPricing);
+      setRestaurant({ name: "Ember & Grain", tagline: "A guest experience preview", publicProfile: { galleryImageUrls: [], openingHours: [], reservationEnabled: true, publicContactEnabled: false } });
       setMenuError(undefined);
       setMenuLoading(false);
     }
@@ -944,13 +946,13 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   );
 
   const value = useMemo<PosStore>(() => ({
-    menu, menuCategories, pricing, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
+    menu, menuCategories, pricing, restaurant, menuLoading, menuError, refreshMenu, refreshOperations, cart, cartSubtotal, cartTax, cartService, cartTotal, cartMode, cartOpen, tables, orders, tickets,
     selectedTableId, toasts, session, authLoading, demoMode, isPending, resetPreview, addToCart, updateLineQuantity, clearCart, setCartMode, setCartOpen,
     selectTable, adjustGuests, openTableSession, updateTableSession, closeTableSession, placeOrder, startTicket, markTicketItemReady, markTicketReady, bumpTicket, serveOrder,
     requestBill, takeCashPayment, completeOrder, notify, login, logout,
   }), [
     addToCart, adjustGuests, bumpTicket, cart, cartMode, cartOpen, cartService, cartSubtotal, cartTax,
-    authLoading, cartTotal, clearCart, demoMode, isPending, login, logout, markTicketItemReady, menu, menuCategories, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill, resetPreview,
+    authLoading, cartTotal, clearCart, demoMode, isPending, login, logout, markTicketItemReady, menu, menuCategories, menuError, menuLoading, notify, orders, placeOrder, pricing, refreshMenu, requestBill, resetPreview, restaurant,
     closeTableSession, completeOrder, openTableSession, selectedTableId, serveOrder, session, startTicket, takeCashPayment, markTicketReady, tables, tickets, toasts, updateLineQuantity, updateTableSession,
   ]);
 

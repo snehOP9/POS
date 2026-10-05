@@ -1,4 +1,4 @@
-import type { KitchenStation, MenuCategory, MenuItem, MenuModifierGroup, MenuModifierOption, MenuVariant, RestaurantPricingConfig } from "@/shared/types/domain";
+import type { KitchenStation, MenuCategory, MenuItem, MenuModifierGroup, MenuModifierOption, MenuVariant, PublicRestaurantInfo, RestaurantOpeningHour, RestaurantPricingConfig } from "@/shared/types/domain";
 import { fallbackRestaurantPricing } from "@/shared/lib/cart";
 
 type UnknownRecord = Record<string, unknown>;
@@ -44,6 +44,51 @@ const modifierGroups = (value: unknown): MenuModifierGroup[] => Array.isArray(va
     options: modifierOptions(group.options),
   }];
 }) : [];
+
+const weekdays: RestaurantOpeningHour["day"][] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const openingHours = (value: unknown): RestaurantOpeningHour[] => Array.isArray(value) ? value.flatMap((raw) => {
+  const hour = asRecord(raw);
+  if (!hour || !weekdays.includes(hour.day as RestaurantOpeningHour["day"])) return [];
+  return [{
+    day: hour.day as RestaurantOpeningHour["day"],
+    opens: typeof hour.opens === "string" ? hour.opens : undefined,
+    closes: typeof hour.closes === "string" ? hour.closes : undefined,
+    closed: hour.closed === true,
+  }];
+}) : [];
+
+export const normalizePublicRestaurant = (payload: unknown): PublicRestaurantInfo | undefined => {
+  const data = asRecord(payload);
+  const restaurant = asRecord(data?.restaurant);
+  if (!restaurant) return undefined;
+  const profile = asRecord(restaurant.publicProfile);
+  return {
+    id: typeof restaurant.id === "string" ? restaurant.id : undefined,
+    name: readString(restaurant.name, "Your restaurant"),
+    tagline: typeof restaurant.tagline === "string" ? restaurant.tagline : undefined,
+    description: typeof restaurant.description === "string" ? restaurant.description : undefined,
+    phone: typeof restaurant.phone === "string" ? restaurant.phone : undefined,
+    supportEmail: typeof restaurant.supportEmail === "string" ? restaurant.supportEmail : undefined,
+    address: typeof restaurant.address === "string" ? restaurant.address : undefined,
+    currency: typeof restaurant.currency === "string" ? restaurant.currency : undefined,
+    timezone: typeof restaurant.timezone === "string" ? restaurant.timezone : undefined,
+    publicProfile: profile ? {
+      cuisine: typeof profile.cuisine === "string" ? profile.cuisine : undefined,
+      story: typeof profile.story === "string" ? profile.story : undefined,
+      chefName: typeof profile.chefName === "string" ? profile.chefName : undefined,
+      chefRole: typeof profile.chefRole === "string" ? profile.chefRole : undefined,
+      heroImageUrl: typeof profile.heroImageUrl === "string" ? profile.heroImageUrl : undefined,
+      galleryImageUrls: Array.isArray(profile.galleryImageUrls) ? profile.galleryImageUrls.filter((url): url is string => typeof url === "string") : [],
+      bookingUrl: typeof profile.bookingUrl === "string" ? profile.bookingUrl : undefined,
+      reservationEnabled: profile.reservationEnabled !== false,
+      publicContactEnabled: profile.publicContactEnabled === true,
+      openingHours: openingHours(profile.openingHours),
+      parkingNote: typeof profile.parkingNote === "string" ? profile.parkingNote : undefined,
+      accessibilityNote: typeof profile.accessibilityNote === "string" ? profile.accessibilityNote : undefined,
+      instagramUrl: typeof profile.instagramUrl === "string" ? profile.instagramUrl : undefined,
+    } : undefined
+  };
+};
 
 export const normalizeRestaurantPricing = (payload: unknown): RestaurantPricingConfig => {
   const data = asRecord(payload);
@@ -97,6 +142,7 @@ export const normalizeMenuPayload = (payload: unknown): MenuItem[] => {
       color: colorWheel[index % colorWheel.length],
       glyph: readString(item.name, "D").slice(0, 1).toUpperCase(),
       tags,
+      allergens: Array.isArray(item.allergens) ? item.allergens.filter((allergen): allergen is string => typeof allergen === "string") : [],
       variants: variants(item.variants),
       modifierGroups: modifierGroups(item.modifierGroups),
     }];

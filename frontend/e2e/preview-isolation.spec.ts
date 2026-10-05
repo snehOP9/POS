@@ -54,7 +54,8 @@ test("guest preview orders reach the kitchen and return a ready update on a phon
   await enterPreview(page, "Guest");
   await page.getByRole("button", { name: "Add" }).first().click();
   await page.getByRole("button", { name: /view tray/i }).click();
-  await page.getByRole("button", { name: "Send to kitchen" }).click();
+  await page.getByRole("button", { name: "Review table order" }).click();
+  await page.getByRole("button", { name: "Confirm and send" }).click();
 
   const tracking = page.locator(".tracking-strip");
   await expect(tracking).toContainText("Confirmed");

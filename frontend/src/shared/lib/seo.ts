@@ -1,4 +1,4 @@
-export type PublicRoute = "/menu" | "/privacy" | "/terms" | "/contact";
+export type PublicRoute = "/" | "/menu" | "/story" | "/visit" | "/reservations" | "/privacy" | "/terms" | "/contact";
 
 type PageMetadata = {
   title: string;
@@ -7,24 +7,44 @@ type PageMetadata = {
 };
 
 const pages: Record<PublicRoute, PageMetadata> = {
+  "/": {
+    title: "Ember & Grain | Modern Indian dining",
+    description: "A considered Indian dining experience, from first look to final course.",
+    indexable: true,
+  },
   "/menu": {
-    title: "Restaurant menu | EmberServe POS",
+    title: "Menu | Ember & Grain",
     description: "Browse current menu availability and begin a pickup or table order.",
     indexable: true,
   },
+  "/story": {
+    title: "Our story | Ember & Grain",
+    description: "The people, ingredients and point of view behind Ember & Grain.",
+    indexable: true,
+  },
+  "/visit": {
+    title: "Visit | Ember & Grain",
+    description: "Opening hours, location and visit information for Ember & Grain.",
+    indexable: true,
+  },
+  "/reservations": {
+    title: "Reservations | Ember & Grain",
+    description: "Request a table at Ember & Grain.",
+    indexable: true,
+  },
   "/privacy": {
-    title: "Privacy notice | EmberServe POS",
-    description: "How EmberServe POS handles ordering, session, and browser-storage information.",
+    title: "Privacy notice | Ember & Grain",
+    description: "How Ember & Grain handles reservation, ordering, session, and browser-storage information.",
     indexable: true,
   },
   "/terms": {
-    title: "Terms of use | EmberServe POS",
-    description: "Terms for using the EmberServe POS customer and staff application.",
+    title: "Terms of use | Ember & Grain",
+    description: "Terms for guest ordering, reservations and restaurant access.",
     indexable: true,
   },
   "/contact": {
-    title: "Contact and data requests | EmberServe POS",
-    description: "Contact EmberServe POS for platform, privacy, security and restaurant-order support enquiries.",
+    title: "Contact | Ember & Grain",
+    description: "Contact Ember & Grain about orders, reservations and privacy requests.",
     indexable: true,
   },
 };
@@ -54,10 +74,10 @@ const upsertCanonical = (href: string) => {
   if (!existing) document.head.append(link);
 };
 
-const upsertSchema = (pathname: string, indexable: boolean, canonical: string) => {
+const upsertSchema = (pathname: string, indexable: boolean, canonical: string, restaurantName: string) => {
   const id = "emberserve-page-schema";
   const existing = document.getElementById(id) as HTMLScriptElement | null;
-  if (!indexable || pathname !== "/menu") {
+  if (!indexable || !["/", "/menu", "/visit", "/reservations"].includes(pathname)) {
     existing?.remove();
     return;
   }
@@ -66,17 +86,22 @@ const upsertSchema = (pathname: string, indexable: boolean, canonical: string) =
   script.type = "application/ld+json";
   script.textContent = JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "WebPage",
-    name: "EmberServe POS menu",
+    "@type": pathname === "/menu" ? "Menu" : "Restaurant",
+    name: restaurantName,
     url: canonical,
-    description: pages["/menu"].description,
+    description: pages[pathname as PublicRoute]?.description ?? pages["/"].description,
   });
   if (!existing) document.head.append(script);
 };
 
-export const updateDocumentMetadata = (pathname: string) => {
+export const updateDocumentMetadata = (pathname: string, restaurant?: { name?: string; description?: string }) => {
+  const configuredName = restaurant?.name?.trim() || "Ember & Grain";
   const page = pages[pathname as PublicRoute] ?? internalPages[pathname];
-  const metadata = page ?? {
+  const metadata = page ? {
+    ...page,
+    title: page.title.replaceAll("Ember & Grain", configuredName),
+    description: pathname === "/" && restaurant?.description?.trim() ? restaurant.description.trim() : page.description,
+  } : {
     title: "Page not found | EmberServe POS",
     description: "The requested EmberServe POS page could not be found.",
     indexable: false,
@@ -97,5 +122,5 @@ export const updateDocumentMetadata = (pathname: string) => {
   upsertMeta("name", "twitter:description", metadata.description);
   upsertMeta("name", "twitter:image", socialImage);
   upsertCanonical(canonical);
-  upsertSchema(pathname, metadata.indexable, canonical);
+  upsertSchema(pathname, metadata.indexable, canonical, configuredName);
 };
