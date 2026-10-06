@@ -9,6 +9,7 @@ test("restaurant home, visit, and reservation routes remain clear and responsive
     await page.goto("/");
     await expect(page).toHaveTitle("Ember & Grain | Modern Indian dining");
     await expect(page.getByRole("heading", { name: "A modern Indian table, made for lingering." })).toBeVisible();
+    await expect(page.getByAltText("A warmly lit Ember & Grain dining table beside the open kitchen")).toHaveAttribute("src", "/ember-grain-dining-room.png");
     await expect(page.getByRole("link", { name: "Book a table" }).first()).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     if (width === 390) {
