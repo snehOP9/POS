@@ -404,3 +404,52 @@ small { color: var(--text-muted); }
 @media (prefers-reduced-motion: reduce) {
   .restaurant-header__nav a::after, .restaurant-header__booking { transition: none; }
 }
+
+/* Theme toggle and dark palette. The toggle is application-wide so a guest or
+   member of staff can keep the same preference while moving between routes. */
+.theme-toggle { position: fixed; z-index: 90; right: 18px; bottom: max(18px, env(safe-area-inset-bottom)); display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid rgba(107, 83, 55, .24); border-radius: 50%; background: rgba(255, 250, 242, .94); box-shadow: 0 10px 24px rgba(50, 35, 19, .16); color: #4e4031; backdrop-filter: blur(12px); transition: transform 160ms ease, background 160ms ease, color 160ms ease, border-color 160ms ease; }
+.theme-toggle:hover { border-color: rgba(157, 66, 18, .62); transform: translateY(-2px); }.theme-toggle:focus-visible { outline: 3px solid rgba(232, 115, 36, .42); outline-offset: 3px; }.theme-toggle__sun, .theme-toggle__moon { position: absolute; transition: opacity 160ms ease, transform 160ms ease; }.theme-toggle__moon { opacity: 0; transform: rotate(-35deg) scale(.5); }
+
+html[data-theme="dark"] { color-scheme: dark; --background-main: #171512; --background-elevated: #211d19; --background-muted: #2c2620; --surface-card: rgba(37, 32, 27, .94); --surface-overlay: rgba(14, 12, 10, .82); --text-primary: #f7eee2; --text-secondary: #d4c4b1; --text-muted: #a99a8b; --border-subtle: rgba(245, 224, 194, .16); --border-strong: rgba(245, 224, 194, .31); --brand-saffron: #f28a3d; --brand-saffron-hover: #ffc080; --success-herb: #8ecfa4; --danger-ruby: #ff9b90; --status-new: #9fcff0; }
+html[data-theme="dark"] body { background: var(--background-main); }
+html[data-theme="dark"] .theme-toggle { border-color: rgba(255, 211, 158, .28); background: rgba(38, 33, 28, .94); color: #ffd28c; box-shadow: 0 11px 28px rgba(0, 0, 0, .38); } html[data-theme="dark"] .theme-toggle__moon { opacity: 1; transform: rotate(0) scale(1); } html[data-theme="dark"] .theme-toggle__sun { opacity: 0; transform: rotate(-35deg) scale(.5); }
+
+html[data-theme="dark"] :is(.customer-page, .restaurant-site, .access-page, .login-page, .not-found, .route-loader, .waiter-page) { background: var(--background-main); color: var(--text-primary); }
+html[data-theme="dark"] :is(.customer-nav, .waiter-header) { background: rgba(27, 24, 20, .88); }
+html[data-theme="dark"] .customer-page { background: linear-gradient(180deg, #1b1814 0, #151311 76%, #100f0d 100%); }
+html[data-theme="dark"] .restaurant-site { background: #17130f; color: var(--text-primary); }
+html[data-theme="dark"] :is(.restaurant-header, .customer-nav, .access-header, .waiter-header) .brand { color: #fff2df; } html[data-theme="dark"] :is(.restaurant-header, .customer-nav, .access-header, .waiter-header) .brand :is(strong, small, span) { color: inherit; }
+html[data-theme="dark"] .restaurant-hero { background: #31271d; box-shadow: 0 18px 42px rgba(0, 0, 0, .3); }
+html[data-theme="dark"] :is(.restaurant-hero__copy p, .restaurant-page-heading p, .restaurant-hero__meta, .restaurant-intro-grid p, .restaurant-story-teaser p, .restaurant-visit-grid p, .restaurant-visit-grid small, .restaurant-story-page__body p, .restaurant-hours dd, .cart-review p) { color: var(--text-secondary); }
+html[data-theme="dark"] :is(.restaurant-intro-grid article, .restaurant-signature-card, .restaurant-visit-grid article, .reservation-form, .restaurant-profile-panel, .reservation-management-panel, .access-profile, .role-option, .form-field > div, .staff-profile-dialog) { border-color: var(--border-subtle); background: var(--surface-card); color: var(--text-primary); box-shadow: 0 8px 25px rgba(0, 0, 0, .18); }
+html[data-theme="dark"] :is(.restaurant-story-page__body article, .restaurant-story-page__body article:last-child) { background: #2a241d; color: var(--text-primary); }
+html[data-theme="dark"] :is(.restaurant-gallery-preview__placeholder, .restaurant-loading-card, .menu-skeleton) { border-color: var(--border-subtle); background: #2b241d; color: var(--text-secondary); }
+html[data-theme="dark"] :is(.reservation-form input, .reservation-form select, .reservation-form textarea, .cart-review input, .operations-order-card__actions--payment input, .form-field > div, .allergen-filter) { border-color: var(--border-subtle); background: #211c17; color: var(--text-primary); }
+html[data-theme="dark"] :is(input, select, textarea)::placeholder { color: #aa9a89; }
+html[data-theme="dark"] :is(.outline-button, .customer-access-link, .restaurant-header__menu-toggle, .menu-load-more) { border-color: var(--border-subtle); background: #27211b; color: var(--text-primary); }
+html[data-theme="dark"] .restaurant-header__mobile-menu { border-color: var(--border-subtle); background: rgba(34, 29, 24, .98); }.restaurant-header__mobile-menu a { color: var(--text-primary); } html[data-theme="dark"] .restaurant-header__mobile-menu a:hover, html[data-theme="dark"] .restaurant-header__mobile-menu a:focus-visible { background: #3a2e22; color: #ffd29b; }
+html[data-theme="dark"] :is(.access-profile--guest, .role-option--active) { background: linear-gradient(145deg, #342419, #242019); }
+html[data-theme="dark"] :is(.access-profile__icon, .role-option > span, .staff-profile-dialog__identity > span) { background: #3b2d20; color: #ffd09b; }
+html[data-theme="dark"] :is(.access-note, .reservation-success) { border-color: rgba(116, 193, 143, .35); background: #1c3025; color: #c7ecd2; } html[data-theme="dark"] :is(.access-note p, .reservation-success p) { color: inherit; }
+html[data-theme="dark"] :is(.cashier-page, .cashier-main) { background: #171512; color: var(--text-primary); }
+html[data-theme="dark"] :is(.cashier-header, .cashier-workspace, .cashier-products, .cashier-bill, .pos-bill, .cashier-product, .operations-order-card, .cashier-mobile-nav) { border-color: var(--border-subtle); background-color: #211d19; color: var(--text-primary); }
+html[data-theme="dark"] :is(.cashier-product, .table-card, .zone-tab, .ready-table-pills button, .waiter-tip) { border-color: var(--border-subtle); background: #28221c; color: var(--text-primary); }
+html[data-theme="dark"] :is(.table-card--ready, .table-card--attention, .table-card--bill) { background: #2b241d; }
+html[data-theme="dark"] :is(.waiter-ready-strip, .cashier-message, .cashier-empty-state) { border-color: rgba(116, 193, 143, .28); background: #1d3025; color: #c7ecd2; }
+html[data-theme="dark"] :is(.waiter-tip p, .waiter-tip strong, .table-card__foot b, .table-card__guests, .order-mode) { color: var(--text-secondary); }
+html[data-theme="dark"] :is(.waiter-order-sheet, .waiter-order-sheet__footer, .waiter-mobile-nav) { border-color: var(--border-subtle); background: #211d19; color: var(--text-primary); }
+html[data-theme="dark"] :is(.guest-control button, .sheet-subhead > b, .sent-line__qty) { border-color: var(--border-subtle); background: #312920; color: var(--text-secondary); }
+html[data-theme="dark"] :is(.waiter-order-sheet__footer > div:first-child strong, .waiter-order-sheet .outline-button) { color: var(--text-primary); }
+html[data-theme="dark"] :is(.waiter-order-sheet input, .waiter-order-sheet .search-field) { border-color: var(--border-subtle); background: #302821; color: var(--text-primary); }
+html[data-theme="dark"] :is(.dish-dialog, .cart-drawer, .modal, [role="dialog"]) { background-color: #211d19; color: var(--text-primary); }
+html[data-theme="dark"] .menu-card { border-color: var(--border-subtle); background: #26201a; color: var(--text-primary); } html[data-theme="dark"] .menu-card :is(p, small) { color: var(--text-secondary); }
+html[data-theme="dark"] :is(.menu-toolbar, .menu-refinements, .filter-chip, .menu-result-count, .allergen-filter) { border-color: var(--border-subtle); background-color: #211c17; color: var(--text-primary); }
+html[data-theme="dark"] :is(.legal-page, .legal-page main) { background: var(--background-main); color: var(--text-primary); }
+html[data-theme="dark"] :is(.legal-card, .legal-content, .legal-page article) { border-color: var(--border-subtle); background: var(--surface-card); color: var(--text-primary); }
+html[data-theme="dark"] .login-form-shell { background: var(--background-main); color: var(--text-primary); }
+html[data-theme="dark"] .toast { border-color: var(--border-subtle); background: #28221c; color: var(--text-primary); }
+html[data-theme="dark"] .public-footer { border-color: rgba(255, 255, 255, .1); }
+
+@media (max-width: 780px) { .theme-toggle { right: 14px; bottom: calc(82px + env(safe-area-inset-bottom)); } }
+@media (max-width: 620px) { .cashier-page .theme-toggle { bottom: calc(82px + env(safe-area-inset-bottom)); } }
+@media (prefers-reduced-motion: reduce) { .theme-toggle, .theme-toggle__sun, .theme-toggle__moon { transition: none; } }
