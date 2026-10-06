@@ -1,45 +1,21 @@
 import { Moon, Sun } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { flushSync } from "react-dom";
-
-type Theme = "light" | "dark";
-
-const storageKey = "emberserve.theme";
-
-const getStoredTheme = (): Theme => {
-  try {
-    return window.localStorage.getItem(storageKey) === "dark" ? "dark" : "light";
-  } catch {
-    return "light";
-  }
-};
-
-const applyTheme = (theme: Theme) => {
-  document.documentElement.dataset.theme = theme;
-  try {
-    window.localStorage.setItem(storageKey, theme);
-  } catch {
-    // Private browsing can deny storage; the in-memory preference still works.
-  }
-};
+import { useThemePreference, type ThemePreference } from "@/shared/lib/theme-preference";
 
 export const ThemeToggle = () => {
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [theme, setTheme] = useState<Theme>(getStoredTheme);
-  const isDark = theme === "dark";
-
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+  const { resolvedTheme, setPreference } = useThemePreference();
+  const isDark = resolvedTheme === "dark";
 
   const changeTheme = () => {
-    const nextTheme: Theme = isDark ? "light" : "dark";
+    const nextTheme: ThemePreference = isDark ? "light" : "dark";
     const canAnimate = "startViewTransition" in document
       && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const button = buttonRef.current;
 
     if (!canAnimate || !button) {
-      setTheme(nextTheme);
+      setPreference(nextTheme);
       return;
     }
 
@@ -48,7 +24,7 @@ export const ThemeToggle = () => {
     const startY = y + height / 2;
     const endRadius = Math.hypot(Math.max(startX, innerWidth - startX), Math.max(startY, innerHeight - startY));
     const transition = document.startViewTransition(() => {
-      flushSync(() => setTheme(nextTheme));
+      flushSync(() => setPreference(nextTheme));
     });
 
     transition.ready.then(() => {
