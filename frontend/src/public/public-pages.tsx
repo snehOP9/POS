@@ -57,7 +57,7 @@ export const PublicFooter = () => {
       <button type="button" onClick={() => setCookiesOpen(true)} aria-haspopup="dialog">Cookie and storage notice</button>
     </nav>
     <div className="public-footer__details">
-      <div className="public-footer__section"><strong>{restaurant.name} guest contact</strong><RestaurantContactDetails restaurant={restaurant} /></div>
+      <div className="public-footer__section"><strong>Plan your visit</strong><p className="public-footer__contact-note">Find directions, opening hours and the restaurant's published guest contact channel in one place.</p><Link className="public-footer__visit-link" to="/visit">Visit information</Link></div>
       <div className="public-footer__section"><strong>Restaurant team</strong><p className="public-footer__contact-note">Staff access is protected and available only to authorised restaurant colleagues.</p></div>
     </div>
     <small className="public-footer__legal">Last updated {lastUpdated}. Menu availability, pricing, reservations and service are confirmed by the restaurant.</small>
@@ -110,8 +110,7 @@ const ContactPage = ({ restaurant }: { restaurant: PublicRestaurantInfo }) => <a
   <p>For a question about this website, the Privacy Notice, the Terms of Use, a security concern, or a request to access, correct or delete personal information, contact the restaurant through the published channel below. Please explain the purpose of your message and provide only the minimum information needed to identify the relevant interaction. Do not send passwords, payment credentials, identity documents or confidential restaurant data by email or text message.</p>
   <RestaurantContactDetails restaurant={restaurant} />
   <h2>Restaurant order support</h2>
-  <p>For an active order, food availability, pickup timing, table service, a kitchen note, cancellation or payment question, the restaurant is normally best placed to help. Use the restaurant contact details published below when available, and include the order reference and the time of the request. Direct guest checkout keeps the service focused on the order context and operational status.</p>
-  <RestaurantContactDetails restaurant={restaurant} />
+  <p>For an active order, food availability, pickup timing, table service, a kitchen note, cancellation or payment question, the restaurant is normally best placed to help. Use the contact channel above and include the order reference and the time of the request. Direct guest checkout keeps the service focused on the order context and operational status.</p>
   <h2>Response and escalation</h2>
   <p>Messages are reviewed in good faith and routed according to their nature. Security reports are prioritised, privacy requests may require reasonable identity verification, and restaurant fulfilment questions may need to be handled by the restaurant directly. If an issue cannot be resolved through the published contacts, you may use the contact details above to request a written acknowledgement and next steps. This contact page does not create an emergency support channel or a guarantee of immediate response.</p>
 </article>;
