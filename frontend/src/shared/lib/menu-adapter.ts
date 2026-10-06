@@ -62,7 +62,7 @@ export const normalizePublicRestaurant = (payload: unknown): PublicRestaurantInf
   const restaurant = asRecord(data?.restaurant);
   if (!restaurant) return undefined;
   const profile = asRecord(restaurant.publicProfile);
-  return {
+  const normalized: PublicRestaurantInfo = {
     id: typeof restaurant.id === "string" ? restaurant.id : undefined,
     name: readString(restaurant.name, "Your restaurant"),
     tagline: typeof restaurant.tagline === "string" ? restaurant.tagline : undefined,
@@ -87,6 +87,18 @@ export const normalizePublicRestaurant = (payload: unknown): PublicRestaurantInf
       accessibilityNote: typeof profile.accessibilityNote === "string" ? profile.accessibilityNote : undefined,
       instagramUrl: typeof profile.instagramUrl === "string" ? profile.instagramUrl : undefined,
     } : undefined
+  };
+  const isLegacyDemo = normalized.name === "EmberServe Demo Restaurant" || normalized.description?.includes("production-shaped demonstration") === true;
+  if (!isLegacyDemo) return normalized;
+  return {
+    ...normalized,
+    name: "Ember & Grain",
+    tagline: "A modern Indian table, made for lingering.",
+    description: "Live-fire cooking, bright regional flavours and generous plates for the middle of the table.",
+    publicProfile: {
+      ...(normalized.publicProfile ?? { galleryImageUrls: [], openingHours: [], reservationEnabled: true, publicContactEnabled: false }),
+      cuisine: normalized.publicProfile?.cuisine ?? "Contemporary Indian dining"
+    }
   };
 };
 
