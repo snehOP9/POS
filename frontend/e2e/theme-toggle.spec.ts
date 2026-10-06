@@ -42,6 +42,23 @@ test("theme preference persists and uses a reduced-motion-safe fallback", async 
   await expectThemeControl(page, 390, "customer menu after navigation");
 });
 
+test("staff appearance control offers light, system, and dark preferences", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await enterPreview(page, "Cashier");
+  await page.getByRole("button", { name: /Preview Cashier, Cashier profile/i }).click();
+  await expect(page.getByRole("dialog", { name: "Preview Cashier" })).toBeVisible();
+
+  const appearance = page.locator(".staff-profile-appearance");
+  await appearance.getByRole("button", { name: "System" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme-preference", "system");
+  await appearance.getByRole("button", { name: "Dark" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme-preference", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await appearance.getByRole("button", { name: "Light" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme-preference", "light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+});
+
 test("theme control and page actions remain reachable in every public route and workspace", async ({ page }) => {
   test.setTimeout(120_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
