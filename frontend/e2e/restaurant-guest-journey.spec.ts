@@ -8,10 +8,14 @@ test("restaurant home, visit, and reservation routes remain clear and responsive
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     await expect(page).toHaveTitle("Ember & Grain | Modern Indian dining");
-    await expect(page.getByRole("heading", { name: "A table worth lingering over." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "A modern Indian table, made for lingering." })).toBeVisible();
     await expect(page.getByRole("link", { name: "Book a table" }).first()).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     if (width === 390) {
+      await page.getByRole("button", { name: "Open navigation" }).click();
+      await expect(page.getByRole("button", { name: "Close navigation" })).toHaveAttribute("aria-expanded", "true");
+      await expect(page.locator("#restaurant-mobile-navigation a")).toHaveCount(5);
+      await page.getByRole("button", { name: "Close navigation" }).click();
       await page.addScriptTag({ content: axe.source });
       const result = await page.evaluate(async () => {
         const runner = window as typeof window & { axe: typeof axe };
