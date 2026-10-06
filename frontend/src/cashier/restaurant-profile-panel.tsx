@@ -53,11 +53,27 @@ const draftFromRestaurant = (restaurant?: PublicRestaurantInfo): RestaurantProfi
   };
 };
 
+const asRestaurant = (value: unknown): PublicRestaurantInfo | undefined => {
+  if (!value || typeof value !== "object" || typeof (value as { name?: unknown }).name !== "string") return undefined;
+  return value as PublicRestaurantInfo;
+};
+
 export const RestaurantProfilePanel = ({ restaurant, demoMode, refreshMenu, notify }: { restaurant?: PublicRestaurantInfo; demoMode: boolean; refreshMenu: () => void; notify: (message: string, tone?: ToastMessage["tone"]) => void }) => {
   const [draft, setDraft] = useState<RestaurantProfileDraft>(() => draftFromRestaurant(restaurant));
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => setDraft(draftFromRestaurant(restaurant)), [restaurant]);
+  useEffect(() => {
+    setDraft(draftFromRestaurant(restaurant));
+    if (demoMode) return;
+    let active = true;
+    void api.restaurant.getProfile().then((payload) => {
+      const ownerRestaurant = asRestaurant(payload);
+      if (active && ownerRestaurant) setDraft(draftFromRestaurant(ownerRestaurant));
+    }).catch((error: unknown) => {
+      if (active) notify(error instanceof ApiError ? error.message : "Restaurant profile could not be loaded.", "danger");
+    });
+    return () => { active = false; };
+  }, [demoMode, notify, restaurant]);
 
   const updateHour = (day: RestaurantOpeningHour["day"], patch: Partial<RestaurantOpeningHour>) => setDraft((current) => ({ ...current, openingHours: current.openingHours.map((entry) => entry.day === day ? { ...entry, ...patch } : entry) }));
   const submit = (event: FormEvent<HTMLFormElement>) => {

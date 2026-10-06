@@ -20,20 +20,6 @@ const fallbackRestaurant: PublicRestaurantInfo = {
 const defaultStory = "Ember & Grain is a contemporary Indian dining room shaped around the pleasure of sharing. We bring together live-fire cooking, bright regional flavours and the dishes that make the best kind of meal: the one everyone reaches for in the middle of the table.";
 const defaultKitchenStory = "The menu moves between smoke, spice, acidity and comfort, with ingredients such as coconut, curry leaf, black pepper, kasundi and saffron doing the quiet work. It is food with contrast, made to be passed around and remembered.";
 
-const isLegacyDemoProfile = (restaurant: PublicRestaurantInfo) =>
-  restaurant.name === "EmberServe Demo Restaurant" || restaurant.description?.includes("production-shaped demonstration") === true;
-
-const presentRestaurant = (restaurant: PublicRestaurantInfo): PublicRestaurantInfo => {
-  if (!isLegacyDemoProfile(restaurant)) return restaurant;
-  return {
-    ...restaurant,
-    name: fallbackRestaurant.name,
-    tagline: fallbackRestaurant.tagline,
-    description: fallbackRestaurant.description,
-    publicProfile: { ...restaurant.publicProfile, galleryImageUrls: restaurant.publicProfile?.galleryImageUrls ?? [], reservationEnabled: restaurant.publicProfile?.reservationEnabled ?? true, publicContactEnabled: restaurant.publicProfile?.publicContactEnabled ?? false, openingHours: restaurant.publicProfile?.openingHours ?? [], cuisine: restaurant.publicProfile?.cuisine ?? "Contemporary Indian dining" }
-  };
-};
-
 const dateTimeInputValue = () => {
   const value = new Date(Date.now() + 60 * 60 * 1000);
   value.setMinutes(Math.ceil(value.getMinutes() / 15) * 15, 0, 0);
@@ -48,7 +34,7 @@ const useRestaurant = () => {
   useEffect(() => {
     if (!state.restaurant && !state.menuLoading) state.refreshMenu();
   }, [state.menuLoading, state.refreshMenu, state.restaurant]);
-  return { ...state, restaurant: presentRestaurant(state.restaurant ?? fallbackRestaurant) };
+  return { ...state, restaurant: state.restaurant ?? fallbackRestaurant };
 };
 
 const todayHours = (hours: RestaurantOpeningHour[], timezone?: string) => {
