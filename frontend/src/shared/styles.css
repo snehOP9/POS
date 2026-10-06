@@ -391,6 +391,7 @@ small { color: var(--text-muted); }
 .restaurant-header__mobile-menu { display: none; }
 .public-footer__visit-link { color: #ffc176; font-size: .78rem; font-weight: 850; }
 .public-footer__visit-link:hover { color: #fff8ed; }
+.restaurant-gallery-preview--owned { overflow: hidden; border-radius: 22px; background: #2a2119; box-shadow: 0 16px 36px rgba(75, 45, 16, .17); }.restaurant-gallery-preview--owned .restaurant-gallery-preview__image { inset: 0; width: 100%; height: 100%; border-radius: 0; box-shadow: none; }.restaurant-gallery-preview--owned::after { position: absolute; inset: 0; background: linear-gradient(145deg, rgba(30, 17, 8, .14), transparent 46%, rgba(25, 13, 6, .22)); content: ""; pointer-events: none; }
 
 @media (max-width: 780px) {
   .restaurant-header { min-height: 72px; }

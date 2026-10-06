@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowRight, CalendarDays, ChefHat, Clock3, ExternalLink, MapPin, Menu, Phone, ShieldCheck, Sparkles, UtensilsCrossed, UsersRound, X } from "lucide-react";
+import { ArrowRight, CalendarDays, Clock3, ExternalLink, MapPin, Menu, Phone, ShieldCheck, Sparkles, UtensilsCrossed, UsersRound, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { FoodVisual } from "@/shared/components/food-visual";
@@ -19,6 +19,7 @@ const fallbackRestaurant: PublicRestaurantInfo = {
 
 const defaultStory = "Ember & Grain is a contemporary Indian dining room shaped around the pleasure of sharing. We bring together live-fire cooking, bright regional flavours and the dishes that make the best kind of meal: the one everyone reaches for in the middle of the table.";
 const defaultKitchenStory = "The menu moves between smoke, spice, acidity and comfort, with ingredients such as coconut, curry leaf, black pepper, kasundi and saffron doing the quiet work. It is food with contrast, made to be passed around and remembered.";
+const ownedDiningRoomImage = "/ember-grain-dining-room.png";
 
 const dateTimeInputValue = () => {
   const value = new Date(Date.now() + 60 * 60 * 1000);
@@ -103,6 +104,7 @@ export const RestaurantHomePage = () => {
   const profile = restaurant.publicProfile;
   const signatures = useMemo(() => menu.filter((item) => item.featured).slice(0, 3), [menu]);
   const gallery = profile?.galleryImageUrls ?? [];
+  const storyImages = gallery.length ? gallery.slice(0, 3) : [ownedDiningRoomImage];
 
   return <>
     <main className="restaurant-site">
@@ -130,9 +132,8 @@ export const RestaurantHomePage = () => {
       </section>
       <section className="restaurant-story-teaser">
         <div><span className="eyebrow">Our point of view</span><h2>{profile?.chefName ? `Meet ${profile.chefName}.` : "Food with a sense of place."}</h2><p>{profile?.story ?? defaultStory}</p><Link className="outline-button" to="/story">Discover our story <ArrowRight size={17} /></Link></div>
-        <div className="restaurant-gallery-preview">
-          {gallery.slice(0, 3).map((image, index) => <img key={image} src={image} alt="Restaurant atmosphere" loading="lazy" className={`restaurant-gallery-preview__image restaurant-gallery-preview__image--${index + 1}`} />)}
-          {!gallery.length && <div className="restaurant-gallery-preview__placeholder"><ChefHat size={34} /><span>Owner photography belongs here—not stock imagery.</span></div>}
+        <div className={`restaurant-gallery-preview ${gallery.length ? "" : "restaurant-gallery-preview--owned"}`}>
+          {storyImages.map((image, index) => <img key={image} src={image} alt={gallery.length ? "Restaurant atmosphere" : "A warmly lit Ember & Grain dining table beside the open kitchen"} loading="lazy" className={`restaurant-gallery-preview__image restaurant-gallery-preview__image--${index + 1}`} />)}
         </div>
       </section>
       <VisitCard restaurant={restaurant} />
