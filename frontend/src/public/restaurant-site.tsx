@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowRight, CalendarDays, ChefHat, Clock3, ExternalLink, MapPin, Phone, ShieldCheck, Sparkles, UtensilsCrossed, UsersRound } from "lucide-react";
+import { ArrowRight, CalendarDays, ChefHat, Clock3, ExternalLink, MapPin, Menu, Phone, ShieldCheck, Sparkles, UtensilsCrossed, UsersRound, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { FoodVisual } from "@/shared/components/food-visual";
@@ -12,9 +12,26 @@ import { PublicFooter } from "./public-pages";
 
 const fallbackRestaurant: PublicRestaurantInfo = {
   name: "Ember & Grain",
-  tagline: "A table worth lingering over.",
-  description: "Seasonal Indian plates, cooked with care and served at an unhurried pace.",
+  tagline: "A modern Indian table, made for lingering.",
+  description: "Live-fire cooking, bright regional flavours and generous plates for the middle of the table.",
   publicProfile: { galleryImageUrls: [], openingHours: [], reservationEnabled: true, publicContactEnabled: false }
+};
+
+const defaultStory = "Ember & Grain is a contemporary Indian dining room shaped around the pleasure of sharing. We bring together live-fire cooking, bright regional flavours and the dishes that make the best kind of meal: the one everyone reaches for in the middle of the table.";
+const defaultKitchenStory = "The menu moves between smoke, spice, acidity and comfort, with ingredients such as coconut, curry leaf, black pepper, kasundi and saffron doing the quiet work. It is food with contrast, made to be passed around and remembered.";
+
+const isLegacyDemoProfile = (restaurant: PublicRestaurantInfo) =>
+  restaurant.name === "EmberServe Demo Restaurant" || restaurant.description?.includes("production-shaped demonstration") === true;
+
+const presentRestaurant = (restaurant: PublicRestaurantInfo): PublicRestaurantInfo => {
+  if (!isLegacyDemoProfile(restaurant)) return restaurant;
+  return {
+    ...restaurant,
+    name: fallbackRestaurant.name,
+    tagline: fallbackRestaurant.tagline,
+    description: fallbackRestaurant.description,
+    publicProfile: { ...restaurant.publicProfile, galleryImageUrls: restaurant.publicProfile?.galleryImageUrls ?? [], reservationEnabled: restaurant.publicProfile?.reservationEnabled ?? true, publicContactEnabled: restaurant.publicProfile?.publicContactEnabled ?? false, openingHours: restaurant.publicProfile?.openingHours ?? [], cuisine: restaurant.publicProfile?.cuisine ?? "Contemporary Indian dining" }
+  };
 };
 
 const dateTimeInputValue = () => {
@@ -31,7 +48,7 @@ const useRestaurant = () => {
   useEffect(() => {
     if (!state.restaurant && !state.menuLoading) state.refreshMenu();
   }, [state.menuLoading, state.refreshMenu, state.restaurant]);
-  return { ...state, restaurant: state.restaurant ?? fallbackRestaurant };
+  return { ...state, restaurant: presentRestaurant(state.restaurant ?? fallbackRestaurant) };
 };
 
 const todayHours = (hours: RestaurantOpeningHour[], timezone?: string) => {
@@ -49,18 +66,28 @@ const ReservationCta = ({ restaurant, className = "button button--saffron" }: { 
   return <Link className={className} to="/reservations">Book a table <ArrowRight size={17} /></Link>;
 };
 
-export const RestaurantHeader = ({ restaurant }: { restaurant: PublicRestaurantInfo }) => <header className="restaurant-header">
-  <Brand name={restaurant.name} descriptor={restaurantLabel(restaurant)} />
-  <nav aria-label="Restaurant navigation">
-    <Link to="/menu">Menu</Link>
-    <Link to="/story">Our story</Link>
-    <Link to="/visit">Visit</Link>
-  </nav>
-  <div className="restaurant-header__actions">
-    <Link className="restaurant-header__staff" to="/access">Staff sign in</Link>
-    <ReservationCta restaurant={restaurant} className="restaurant-header__booking" />
-  </div>
-</header>;
+const RestaurantNavigationLinks = ({ onNavigate }: { onNavigate: () => void }) => <>
+  <Link to="/" onClick={onNavigate}>Home</Link>
+  <Link to="/menu" onClick={onNavigate}>Menu</Link>
+  <Link to="/story" onClick={onNavigate}>Our story</Link>
+  <Link to="/visit" onClick={onNavigate}>Visit</Link>
+</>;
+
+export const RestaurantHeader = ({ restaurant }: { restaurant: PublicRestaurantInfo }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
+
+  return <header className="restaurant-header">
+    <Brand name={restaurant.name} descriptor={restaurantLabel(restaurant)} />
+    <nav className="restaurant-header__nav" aria-label="Restaurant navigation"><RestaurantNavigationLinks onNavigate={closeMenu} /></nav>
+    <div className="restaurant-header__actions">
+      <Link className="restaurant-header__staff" to="/access">Staff sign in</Link>
+      <ReservationCta restaurant={restaurant} className="button button--saffron restaurant-header__booking" />
+      <button className="restaurant-header__menu-toggle" type="button" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} aria-controls="restaurant-mobile-navigation" onClick={() => setMenuOpen((open) => !open)}>{menuOpen ? <X size={19} /> : <Menu size={20} />}</button>
+    </div>
+    {menuOpen && <nav id="restaurant-mobile-navigation" className="restaurant-header__mobile-menu" aria-label="Mobile restaurant navigation"><RestaurantNavigationLinks onNavigate={closeMenu} /><Link to="/access" onClick={closeMenu}>Staff sign in</Link></nav>}
+  </header>;
+};
 
 const SignatureCard = ({ item }: { item: ReturnType<typeof useRestaurant>["menu"][number] }) => <Link className="restaurant-signature-card" to="/menu" aria-label={`View ${item.name} on the menu`}>
   <FoodVisual item={item} decorative />
@@ -116,7 +143,7 @@ export const RestaurantHomePage = () => {
         {signatures.length ? <div className="restaurant-signature-grid">{signatures.map((item) => <SignatureCard key={item.id} item={item} />)}</div> : <div className="restaurant-loading-card">{menuLoading ? "Preparing today’s menu…" : "Today’s menu will appear here shortly."}</div>}
       </section>
       <section className="restaurant-story-teaser">
-        <div><span className="eyebrow">Our point of view</span><h2>{profile?.chefName ? `Meet ${profile.chefName}.` : "Food with a sense of place."}</h2><p>{profile?.story ?? "This restaurant is ready for its own story: the people behind the pass, the ingredients worth seeking out, and the rituals that make a meal memorable."}</p><Link className="outline-button" to="/story">Discover our story <ArrowRight size={17} /></Link></div>
+        <div><span className="eyebrow">Our point of view</span><h2>{profile?.chefName ? `Meet ${profile.chefName}.` : "Food with a sense of place."}</h2><p>{profile?.story ?? defaultStory}</p><Link className="outline-button" to="/story">Discover our story <ArrowRight size={17} /></Link></div>
         <div className="restaurant-gallery-preview">
           {gallery.slice(0, 3).map((image, index) => <img key={image} src={image} alt="Restaurant atmosphere" loading="lazy" className={`restaurant-gallery-preview__image restaurant-gallery-preview__image--${index + 1}`} />)}
           {!gallery.length && <div className="restaurant-gallery-preview__placeholder"><ChefHat size={34} /><span>Owner photography belongs here—not stock imagery.</span></div>}
@@ -132,8 +159,8 @@ export const StoryPage = () => {
   const { restaurant } = useRestaurant();
   const profile = restaurant.publicProfile;
   return <><main className="restaurant-site restaurant-story-page"><RestaurantHeader restaurant={restaurant} />
-    <section className="restaurant-page-heading"><span className="eyebrow">The restaurant</span><h1>More than a menu.</h1><p>{profile?.story ?? "A strong restaurant story makes the experience legible: where the food comes from, who cooks it, and why this table exists. Configure that story in cashier settings before publishing."}</p></section>
-    <section className="restaurant-story-page__body"><article><span className="eyebrow">The kitchen</span><h2>{profile?.chefName ? `${profile.chefName}, ${profile.chefRole ?? "Kitchen lead"}` : "The people behind the pass."}</h2><p>{profile?.chefName ? "The restaurant’s culinary leadership is part of the guest experience, from seasonal menus to the last detail on the plate." : "Add the chef and team story from cashier settings to give guests a real reason to care before they arrive."}</p></article><article><span className="eyebrow">The table</span><h2>Seasonal, considered, generous.</h2><p>{restaurant.description ?? "The menu is always current, while the service promise stays simple: clear information, warm hospitality and food worth sharing."}</p></article></section>
+    <section className="restaurant-page-heading"><span className="eyebrow">The restaurant</span><h1>More than a menu.</h1><p>{profile?.story ?? defaultStory}</p></section>
+    <section className="restaurant-story-page__body"><article><span className="eyebrow">The kitchen</span><h2>{profile?.chefName ? `${profile.chefName}, ${profile.chefRole ?? "Kitchen lead"}` : "Made for the middle of the table."}</h2><p>{profile?.chefName ? "The restaurant’s culinary leadership is part of the guest experience, from seasonal menus to the last detail on the plate." : defaultKitchenStory}</p></article><article><span className="eyebrow">The table</span><h2>Seasonal, considered, generous.</h2><p>{restaurant.description ?? "The menu is always current, while the service promise stays simple: clear information, warm hospitality and food worth sharing."}</p></article></section>
     <VisitCard restaurant={restaurant} />
   </main><PublicFooter /></>;
 };
