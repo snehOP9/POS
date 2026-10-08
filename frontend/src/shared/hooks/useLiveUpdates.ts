@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { api, apiIsConfigured, apiRoot, getAccessToken } from "@/shared/lib/api";
 
-export type LiveConnectionState = "preview" | "unconfigured" | "connecting" | "live" | "reconnecting" | "reauthenticating" | "offline";
+export type LiveConnectionState = "preview" | "guest" | "unconfigured" | "connecting" | "live" | "reconnecting" | "reauthenticating" | "offline";
 
 const invalidatingEvents = [
   "order:created",
