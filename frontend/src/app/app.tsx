@@ -29,6 +29,18 @@ const TitleUpdater = () => {
   return null;
 };
 
+const RouteScrollReset = () => {
+  const location = useLocation();
+  useEffect(() => {
+    if (location.hash) {
+      document.getElementById(location.hash.slice(1))?.scrollIntoView();
+      return;
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.hash, location.pathname]);
+  return null;
+};
+
 const NotFound = () => <main className="not-found">
   <div className="not-found__flame"><Flame size={34} /></div>
   <span className="eyebrow">That order number is not on the board</span>
@@ -56,6 +68,7 @@ const RoleGuard = ({ role, children }: PropsWithChildren<{ role: Role }>) => {
 export const App = () => <BrowserRouter>
   <PosProvider>
     <TitleUpdater />
+    <RouteScrollReset />
     <Suspense fallback={<RouteLoader />}>
       <Routes>
         <Route path="/" element={<RestaurantHomePage />} />
