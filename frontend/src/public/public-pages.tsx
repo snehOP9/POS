@@ -23,11 +23,12 @@ const RestaurantContactDetails = ({ restaurant }: { restaurant: PublicRestaurant
   </address>;
 };
 
-const CookiePreferencesDialog = ({ onClose }: { onClose: () => void }) => {
+const CookiePreferencesDialog = ({ restaurant, onClose }: { restaurant: PublicRestaurantInfo; onClose: () => void }) => {
   const dialogRef = useDialogFocus(true, onClose);
   return <div className="cookie-dialog-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="cookie-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="cookie-dialog-title" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
-      <div>
+      <div className="cookie-dialog__heading">
+        <Brand name={restaurant.name} descriptor={restaurant.publicProfile?.cuisine ?? "Restaurant"} />
         <span className="eyebrow"><ShieldCheck size={14} /> Cookie and storage notice</span>
         <h2 id="cookie-dialog-title">Essential storage supports the service</h2>
       </div>
@@ -61,7 +62,7 @@ export const PublicFooter = () => {
       <div className="public-footer__section"><strong>Restaurant team</strong><p className="public-footer__contact-note">Staff access is protected and available only to authorised restaurant colleagues.</p></div>
     </div>
     <small className="public-footer__legal">Last updated {lastUpdated}. Menu availability, pricing, reservations and service are confirmed by the restaurant.</small>
-    {cookiesOpen && <CookiePreferencesDialog onClose={() => setCookiesOpen(false)} />}
+    {cookiesOpen && <CookiePreferencesDialog restaurant={restaurant} onClose={() => setCookiesOpen(false)} />}
   </footer>;
 };
 

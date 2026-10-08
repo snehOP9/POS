@@ -85,7 +85,10 @@ async function seed(): Promise<void> {
     { name: "Regional Classics", description: "Celebrated recipes from across India.", imageUrl: pexels("28675074"), sortOrder: 9 },
     { name: "Street Favourites", description: "Big-flavour bites inspired by the street.", imageUrl: pexels("21078315"), sortOrder: 10 },
     { name: "Bowls & Light Meals", description: "Balanced, satisfying meals for any time of day.", imageUrl: pexels("28674705"), sortOrder: 11 },
-    { name: "Breakfast & Brunch", description: "Slow mornings, familiar comfort and fresh starts.", imageUrl: pexels("20446413"), sortOrder: 12 }
+    { name: "Breakfast & Brunch", description: "Slow mornings, familiar comfort and fresh starts.", imageUrl: pexels("20446413"), sortOrder: 12 },
+    { name: "Seasonal Signatures", description: "Limited-run dishes shaped by the market and the fire.", imageUrl: pexels("28675074"), sortOrder: 13 },
+    { name: "For the Table", description: "Generous sharing plates made for two or more.", imageUrl: pexels("33430556"), sortOrder: 14 },
+    { name: "Chai & Coffee", description: "Slow-brewed tea and coffee for the end, or the pause.", imageUrl: pexels("17200460"), sortOrder: 15 }
   ];
   const categories = await Promise.all(categorySpecs.map((spec) => CategoryModel.findOneAndUpdate(
     { restaurantId: restaurant._id, name: spec.name },

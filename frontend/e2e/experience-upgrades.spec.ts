@@ -18,11 +18,27 @@ test("guest signatures filter to signature dishes and preserves a compact first 
   await page.setViewportSize({ width: 390, height: 844 });
   await enterPreview(page, "Guest");
   const cards = page.locator(".menu-grid:not(.menu-grid--skeleton) .menu-card");
-  await expect(cards).toHaveCount(9);
+  await expect(cards).toHaveCount(12);
 
   await page.getByRole("button", { name: "Signatures", exact: true }).click();
   await expect(cards).toHaveCount(await page.locator(".featured-ribbon").count());
   await expect(cards.first().locator(".featured-ribbon")).toBeVisible();
+});
+
+test("guest menu adds dedicated seasonal, sharing, and chai categories", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterPreview(page, "Guest");
+  const cards = page.locator(".menu-grid:not(.menu-grid--skeleton) .menu-card");
+
+  for (const [category, dish] of [
+    ["Seasonal Signatures", "Smoked Pumpkin Korma"],
+    ["For the Table", "Ember Vegetarian Grill"],
+    ["Chai & Coffee", "Masala Chai"],
+  ] as const) {
+    await page.getByRole("button", { name: category, exact: true }).click();
+    await expect(cards).toHaveCount(3);
+    await expect(page.getByRole("button", { name: dish, exact: true })).toBeVisible();
+  }
 });
 
 test("guest checkout sends an order directly without a verification route", async ({ page }) => {
