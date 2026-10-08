@@ -38,6 +38,7 @@ test("every preview workspace fits compact phones, tablets, and desktop", async 
     for (const preview of previews) {
       await enterPreview(page, preview.role);
       await expect(page.locator(preview.root)).toBeVisible();
+      await expect(page.locator(".connection-badge"), preview.role + " exposes its live status at " + viewport.name).toBeVisible();
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth), {
         message: preview.role + " should not overflow at " + viewport.name,
       }).toBeLessThanOrEqual(viewport.width);
@@ -47,6 +48,17 @@ test("every preview workspace fits compact phones, tablets, and desktop", async 
       if (viewport.width <= 390 && preview.role === "Waiter") await expect(page.locator(".waiter-mobile-nav button").first()).toHaveCSS("min-height", "44px");
     }
   }
+});
+
+test("the interface uses one light theme with no public or profile theme switch", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterPreview(page, "Guest");
+  await expect(page.locator(".theme-toggle")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /switch to (light|dark) theme/i })).toHaveCount(0);
+
+  await enterPreview(page, "Cashier");
+  await page.getByRole("button", { name: /Preview Cashier, Cashier profile/i }).click();
+  await expect(page.locator(".staff-profile-appearance")).toHaveCount(0);
 });
 
 test("profile choices remain discoverable on phones and tablets", async ({ page }) => {

@@ -40,6 +40,25 @@ test("guest checkout sends an order directly without a verification route", asyn
   await expect(page.locator(".tracking-strip")).toContainText("Confirmed");
 });
 
+test("pickup name accepts complete text, celebrates a confirmed order, and opens real tracking", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterPreview(page, "Guest");
+  await page.getByRole("button", { name: "I’ll pick up" }).click();
+  await page.locator(".menu-grid .add-button").first().click();
+  await page.getByRole("button", { name: /view tray/i }).click();
+  await page.getByRole("button", { name: "Review pickup order" }).click();
+  const name = page.getByPlaceholder("Your name");
+  await name.fill("Sneh Raunak");
+  await expect(name).toHaveValue("Sneh Raunak");
+  await page.getByRole("button", { name: "Confirm and send" }).click();
+  await expect(page.getByText("Name confirmed")).toBeVisible();
+  await expect(page.getByText("Sneh Raunak, the kitchen is fired up.")).toBeVisible();
+  await page.getByRole("button", { name: /Track it/i }).click();
+  await expect(page.locator(".order-timeline")).toBeVisible();
+  await expect(page.locator(".order-timeline")).toContainText("Order received");
+  await expect(page.locator(".order-timeline")).toContainText("On the fire");
+});
+
 test("cashier phone keeps the live bill one tap away without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await enterPreview(page, "Cashier");
@@ -55,6 +74,7 @@ test("every phone workspace has no serious WCAG A or AA failures", async ({ page
   for (const role of ["Guest", "Cashier", "Waiter", "Kitchen"] as const) {
     await page.setViewportSize({ width: 390, height: 844 });
     await enterPreview(page, role);
+    await expect(page.locator(".connection-badge")).toBeVisible();
     await page.addScriptTag({ content: axe.source });
     const result = await page.evaluate(async () => {
       const runner = window as typeof window & { axe: typeof axe };

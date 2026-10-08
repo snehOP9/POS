@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, ShoppingBag, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatMoney } from "@/shared/lib/format";
 import { QuantityControl } from "@/shared/components/quantity-control";
 import { useDialogFocus } from "@/shared/hooks/useDialogFocus";
@@ -9,7 +9,7 @@ import { cartLineLabels, cartLineTotal } from "@/shared/lib/cart";
 interface CartDrawerProps {
   checkoutLabel?: string;
   orderMode?: "DINE_IN" | "PICKUP";
-  onCheckout?: (pickup?: { name: string; phone?: string }) => void;
+  onCheckout?: (pickup?: { name: string; phone?: string }) => Promise<boolean> | void;
 }
 
 export const CartDrawer = ({ checkoutLabel = "Send order", orderMode = "DINE_IN", onCheckout }: CartDrawerProps) => {
@@ -18,7 +18,10 @@ export const CartDrawer = ({ checkoutLabel = "Send order", orderMode = "DINE_IN"
     cartSubtotal, cartTax, cartService, cartTotal, pricing, isPending,
   } = usePos();
   const itemCount = cart.reduce((count, line) => count + line.quantity, 0);
-  const drawerRef = useDialogFocus(cartOpen, () => setCartOpen(false));
+  // Keep the focus-trap close handler stable: recreating it on every keypress
+  // was resetting focus to the close button and accepted only one character.
+  const closeCart = useCallback(() => setCartOpen(false), [setCartOpen]);
+  const drawerRef = useDialogFocus(cartOpen, closeCart);
   const submitting = isPending("order:create:customer");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [pickupName, setPickupName] = useState("");
@@ -30,11 +33,11 @@ export const CartDrawer = ({ checkoutLabel = "Send order", orderMode = "DINE_IN"
 
   if (!cartOpen) return null;
   return (
-    <div className="drawer-backdrop" role="presentation" onMouseDown={() => setCartOpen(false)}>
+    <div className="drawer-backdrop" role="presentation" onMouseDown={closeCart}>
       <aside className="cart-drawer" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Current cart" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
         <div className="cart-drawer__header">
           <div><span className="eyebrow">Your selection</span><h2>{itemCount} {itemCount === 1 ? "item" : "items"} on the tray</h2></div>
-          <button type="button" className="icon-button" onClick={() => setCartOpen(false)} aria-label="Close cart"><X /></button>
+          <button type="button" className="icon-button" onClick={closeCart} aria-label="Close cart"><X /></button>
         </div>
         <div className="cart-drawer__items">
           {cart.length ? cart.map((line) => (
@@ -55,9 +58,9 @@ export const CartDrawer = ({ checkoutLabel = "Send order", orderMode = "DINE_IN"
           </dl>
           {reviewOpen ? <div className="cart-review" aria-live="polite">
             <div><span className="eyebrow">Review before sending</span><strong>{orderMode === "PICKUP" ? "Pickup details" : "Table order"}</strong></div>
-            {orderMode === "PICKUP" ? <><label>Pickup name<input required value={pickupName} onChange={(event) => setPickupName(event.target.value)} maxLength={100} placeholder="Your name" autoComplete="name" /></label><label>Phone <small>optional</small><input value={pickupPhone} onChange={(event) => setPickupPhone(event.target.value)} maxLength={30} inputMode="tel" autoComplete="tel" placeholder="For an order question" /></label></> : <p>Your order is sent only to the table connected to this QR code.</p>}
+            {orderMode === "PICKUP" ? <><label>Pickup name<input required value={pickupName} onChange={(event) => setPickupName(event.currentTarget.value)} maxLength={100} placeholder="Your name" autoComplete="name" /></label><label>Phone <small>optional</small><input value={pickupPhone} onChange={(event) => setPickupPhone(event.currentTarget.value)} maxLength={30} inputMode="tel" autoComplete="tel" placeholder="For an order question" /></label></> : <p>Your order is sent only to the table connected to this QR code.</p>}
             <p className="cart-review__note">Please check your items and total. Payment and pickup readiness are confirmed by the restaurant after submission.</p>
-            <div className="cart-review__actions"><button type="button" className="quiet-button" onClick={() => setReviewOpen(false)} disabled={submitting}><ArrowLeft size={16} /> Edit tray</button><button type="button" className="button button--saffron" onClick={() => onCheckout?.(orderMode === "PICKUP" ? { name: pickupName.trim() || "Guest", phone: pickupPhone.trim() || undefined } : undefined)} disabled={submitting || (orderMode === "PICKUP" && !pickupName.trim())}>{submitting ? "Sending order…" : "Confirm and send"} <ArrowRight size={17} /></button></div>
+            <div className="cart-review__actions"><button type="button" className="quiet-button" onClick={() => setReviewOpen(false)} disabled={submitting}><ArrowLeft size={16} /> Edit tray</button><button type="button" className="button button--saffron" onClick={() => { void onCheckout?.(orderMode === "PICKUP" ? { name: pickupName.trim() || "Guest", phone: pickupPhone.trim() || undefined } : undefined); }} disabled={submitting || (orderMode === "PICKUP" && !pickupName.trim())}>{submitting ? "Sending order…" : "Confirm and send"} <ArrowRight size={17} /></button></div>
           </div> : <button type="button" className="button button--saffron button--full" onClick={() => setReviewOpen(true)} disabled={submitting}><span>{checkoutLabel}</span><ArrowRight size={18} /></button>}
         </div>}
       </aside>

@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, Clock3, Flame, Heart, MapPin, Search, ShieldCheck, ShoppingBag, Sparkles, Star, UtensilsCrossed, X } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Check, ChevronRight, Clock3, Flame, Heart, MapPin, Search, ShieldCheck, ShoppingBag, Sparkles, Star, UtensilsCrossed, X } from "lucide-react";
 import { Brand } from "@/shared/components/brand";
 import { CartDrawer } from "@/customer/cart-drawer";
 import { FoodVisual } from "@/shared/components/food-visual";
 import { QuantityControl } from "@/shared/components/quantity-control";
 import { StatusPill } from "@/shared/components/status-pill";
+import { ConnectionBadge } from "@/shared/components/connection-badge";
 import { useDialogFocus } from "@/shared/hooks/useDialogFocus";
 import { requiresConfiguration } from "@/shared/components/item-configurator";
 import { formatMoney } from "@/shared/lib/format";
 import { usePos } from "@/shared/store/pos-store";
 import { selectionForOption, unitPriceForSelection } from "@/shared/lib/cart";
-import type { MenuItem } from "@/shared/types/domain";
+import type { MenuItem, Order, OrderStatus } from "@/shared/types/domain";
 import { isActiveOrder } from "@/shared/lib/order-state";
+import { useLiveUpdates } from "@/shared/hooks/useLiveUpdates";
 import { Link, useLocation } from "react-router-dom";
 import { PublicFooter } from "@/public/public-pages";
 
@@ -81,8 +83,37 @@ const DishDialog = ({ item, onClose }: { item: MenuItem; onClose: () => void }) 
   );
 };
 
+const orderStage = (status: OrderStatus) => {
+  if (["READY", "SERVED", "COMPLETED"].includes(status)) return 2;
+  if (["PREPARING", "PARTIALLY_READY"].includes(status)) return 1;
+  return 0;
+};
+
+const orderStages = [
+  ["Order received", "Your order has reached our team."],
+  ["On the fire", "The kitchen is preparing your dishes."],
+  ["Ready to collect", "We will have it ready for hand-off."],
+] as const;
+
+const OrderTimeline = ({ order }: { order: Order }) => {
+  const currentStage = orderStage(order.status);
+  const cancelled = ["CANCELLED", "REJECTED"].includes(order.status);
+  return <section className="order-timeline" aria-label={`Live status for ${order.displayId}`} aria-live="polite">
+    <header><div><span className="eyebrow">Live order journey</span><h2>{order.displayId} is {order.status.toLowerCase().replaceAll("_", " ")}</h2></div><StatusPill status={order.status} /></header>
+    {cancelled ? <p className="order-timeline__exception">This order needs a restaurant update. Please contact the team if you need help.</p> : <ol>{orderStages.map(([title, detail], index) => <li className={index <= currentStage ? "is-complete" : ""} key={title}><span aria-hidden="true">{index < currentStage ? <Check size={13} /> : index + 1}</span><div><strong>{title}</strong><small>{index === currentStage ? detail : index < currentStage ? "Complete" : "Up next"}</small></div></li>)}</ol>}
+    <footer><span>Updated live</span><time dateTime={order.createdAt}>Ordered {new Date(order.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time></footer>
+  </section>;
+};
+
+const PickupCelebration = ({ name, onTrack, onDismiss }: { name: string; onTrack: () => void; onDismiss: () => void }) => <aside className="pickup-celebration" role="status" aria-live="assertive">
+  <div className="pickup-celebration__sparks" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ "--spark": index } as CSSProperties} />)}</div>
+  <div className="pickup-celebration__flame" aria-hidden="true"><Flame size={29} /></div>
+  <div><span className="eyebrow">Name confirmed</span><strong>{name}, the kitchen is fired up.</strong><p>Your live order journey is ready whenever you are.</p></div>
+  <div className="pickup-celebration__actions"><button type="button" className="button button--saffron" onClick={onTrack}>Track it <ChevronRight size={16} /></button><button type="button" className="quiet-button" onClick={onDismiss}>Dismiss</button></div>
+</aside>;
+
 export const MenuPage = () => {
-  const { cart, setCartOpen, placeOrder, cartMode, setCartMode, orders, menu: items, menuLoading, menuError, refreshMenu, demoMode, notify, restaurant } = usePos();
+  const { cart, setCartOpen, placeOrder, cartMode, setCartMode, orders, menu: items, menuLoading, menuError, refreshMenu, refreshOperations, demoMode, notify, restaurant } = usePos();
   const location = useLocation();
   const tableToken = useMemo(() => {
     const query = new URLSearchParams(location.search);
@@ -97,6 +128,12 @@ export const MenuPage = () => {
   const [excludedAllergen, setExcludedAllergen] = useState("");
   const [menuLimit, setMenuLimit] = useState(12);
   const [selectedDish, setSelectedDish] = useState<MenuItem>();
+  const [trackingOpen, setTrackingOpen] = useState(false);
+  const [celebrationName, setCelebrationName] = useState<string>();
+  const live = useLiveUpdates((events) => {
+    if (events.has("menu:updated") || events.has("connection:restored")) refreshMenu();
+    if ([...events].some((event) => event !== "menu:updated")) refreshOperations();
+  }, !demoMode);
   useEffect(() => {
     refreshMenu();
   }, [refreshMenu]);
@@ -113,6 +150,12 @@ export const MenuPage = () => {
   useEffect(() => {
     if (!dineInAvailable && cartMode === "DINE_IN") setCartMode("PICKUP");
   }, [cartMode, dineInAvailable, setCartMode]);
+
+  useEffect(() => {
+    if (!celebrationName) return;
+    const timer = window.setTimeout(() => setCelebrationName(undefined), 9_000);
+    return () => window.clearTimeout(timer);
+  }, [celebrationName]);
 
   const visibleItems = useMemo(() => items.filter((item) => {
     const matchesCategory = activeCategory === "All" || item.category === activeCategory;
@@ -142,14 +185,14 @@ export const MenuPage = () => {
   const knownAllergens = useMemo(() => [...new Set(items.flatMap((item) => item.allergens ?? []).map((allergen) => allergen.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right)), [items]);
 
   return <><main className="customer-page">
-    <header className="customer-nav"><Brand name={restaurant?.name ?? "Ember & Grain"} descriptor={restaurant?.publicProfile?.cuisine ?? "Restaurant"} /><nav aria-label="Customer navigation"><Link to="/">Home</Link><a href="#menu-list">Menu</a><Link to="/visit">Visit</Link>{restaurant?.publicProfile?.reservationEnabled !== false && <Link to="/reservations">Reservations</Link>}{latestOrder && <a href="#tracking">Order status</a>}</nav><div className="customer-nav__actions"><Link className="customer-access-link" to="/access">Staff sign in</Link><button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
+    <header className="customer-nav"><Brand name={restaurant?.name ?? "Ember & Grain"} descriptor={restaurant?.publicProfile?.cuisine ?? "Restaurant"} /><nav aria-label="Customer navigation"><Link to="/">Home</Link><a href="#menu-list">Menu</a><Link to="/visit">Visit</Link>{restaurant?.publicProfile?.reservationEnabled !== false && <Link to="/reservations">Reservations</Link>}{latestOrder && <a href="#tracking" onClick={() => setTrackingOpen(true)}>Order status</a>}</nav><div className="customer-nav__actions"><ConnectionBadge live={live} /><Link className="customer-access-link" to="/access">Staff sign in</Link><button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
 
     <section className="menu-hero">
       <div className="menu-hero__copy"><span className="hero-kicker"><span>A brighter kind of dining</span><Sparkles size={14} aria-hidden="true" /></span><h1>Bold flavours,<br /><em>served slow enough</em><br />to remember.</h1><p>Seasonal Indian plates, grilled over flame and brought to your table with care.</p><a className="button button--charcoal" href="#menu-list">Explore today’s menu <ChevronRight size={17} /></a><div className="hero-context"><span><MapPin size={16} /> {dineInAvailable ? "Table ordering is available for this visit" : "Pickup ordering is available"}</span><span><Clock3 size={16} /> Availability is confirmed at checkout</span></div></div>
       <div className="menu-hero__art" aria-hidden="true"><div className="hero-sun" /><div className="hero-smoke hero-smoke--one" /><div className="hero-smoke hero-smoke--two" /><div className="hero-bowl"><span>✦</span></div><div className="hero-leaf hero-leaf--one" /><div className="hero-leaf hero-leaf--two" /><p>EMBER<br />&amp; GRAIN</p></div>
     </section>
 
-    {latestOrder && <section className="tracking-strip" id="tracking"><div className="tracking-strip__main"><span className="tracking-orb"><Flame size={20} /></span><div><span className="eyebrow">Your kitchen update</span><strong>{latestOrder.displayId} · {latestOrder.tableLabel}</strong></div></div><StatusPill status={latestOrder.status} /><div className="order-progress" aria-label={`Order ${latestOrder.status.toLowerCase()}`}><span className="is-complete" /><span className={latestOrder.status === "READY" || latestOrder.status === "SERVED" ? "is-complete" : ""} /><span className={latestOrder.status === "SERVED" ? "is-complete" : ""} /></div><button type="button" className="quiet-button" onClick={() => { document.getElementById("tracking")?.scrollIntoView({ behavior: "smooth", block: "center" }); notify(`${latestOrder.displayId} is ${latestOrder.status.toLowerCase().replace("_", " ")}.`, "info"); }}>Track order <ChevronRight size={16} /></button></section>}
+    {latestOrder && <section className="tracking-strip" id="tracking"><div className="tracking-strip__main"><span className="tracking-orb"><Flame size={20} /></span><div><span className="eyebrow">Your kitchen update</span><strong>{latestOrder.displayId} · {latestOrder.tableLabel}</strong></div></div><StatusPill status={latestOrder.status} /><div className="order-progress" aria-label={`Order ${latestOrder.status.toLowerCase()}`}><span className="is-complete" /><span className={latestOrder.status === "READY" || latestOrder.status === "SERVED" ? "is-complete" : ""} /><span className={latestOrder.status === "SERVED" ? "is-complete" : ""} /></div><button type="button" className="quiet-button" aria-expanded={trackingOpen} aria-controls="order-timeline" onClick={() => setTrackingOpen((open) => !open)}>{trackingOpen ? "Hide tracking" : "Track order"} <ChevronRight size={16} /></button>{trackingOpen && <div id="order-timeline" className="tracking-strip__timeline"><OrderTimeline order={latestOrder} /></div>}</section>}
 
     <section className="featured-section"><div className="section-heading"><div><span className="eyebrow">Chef’s spark</span><h2>Worth gathering around</h2></div><button type="button" className="signature-link" onClick={() => { setSearch(""); setActiveCategory("All"); setDietaryFilter("all"); setExcludedAllergen(""); setSpicyOnly(false); setShowSignatures(true); document.getElementById("menu-list")?.scrollIntoView({ behavior: "smooth", block: "start" }); notify("Showing our signature dishes.", "info"); }}>See all signatures <ChevronRight size={16} /></button></div><div className="featured-rail">{featured.map((item) => <button className={`feature-card feature-card--${item.color}`} type="button" key={item.id} onClick={() => setSelectedDish(item)}><FoodVisual item={item} size="feature" decorative /><span className="feature-card__label">{item.tags[0] ?? "House special"}</span><div><strong>{item.name}</strong><span>{formatMoney(item.price)} · {item.prepMinutes} min</span></div></button>)}</div></section>
 
@@ -161,8 +204,12 @@ export const MenuPage = () => {
     <CartDrawer
       checkoutLabel={cartMode === "DINE_IN" ? "Review table order" : "Review pickup order"}
       orderMode={cartMode === "DINE_IN" ? "DINE_IN" : "PICKUP"}
-      onCheckout={(pickup) => placeOrder("customer", "UNPAID", undefined, pickup, undefined, tableToken)}
+      onCheckout={async (pickup) => {
+        const placed = await placeOrder("customer", "UNPAID", undefined, pickup, undefined, tableToken);
+        if (placed && pickup?.name) setCelebrationName(pickup.name);
+        return placed;
+      }}
     />
     {selectedDish && <DishDialog item={selectedDish} onClose={() => setSelectedDish(undefined)} />}
-  </main><PublicFooter /></>;
+  </main>{celebrationName && <PickupCelebration name={celebrationName} onDismiss={() => setCelebrationName(undefined)} onTrack={() => { setCelebrationName(undefined); setTrackingOpen(true); window.setTimeout(() => document.getElementById("tracking")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0); }} />}<PublicFooter /></>;
 };

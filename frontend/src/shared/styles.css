@@ -91,7 +91,7 @@ small { color: var(--text-muted); }
 
 .connection-badge { display: inline-flex; align-items: center; gap: 6px; color: #80796e; font-size: .69rem; font-weight: 750; white-space: nowrap; }
 .connection-badge svg { color: #ba8b45; }
-.connection-badge--live { color: var(--success-herb); }
+.connection-badge--live { color: #2f6a45; }
 .connection-badge--live svg { color: var(--success-herb); animation: signal 1.7s ease-in-out infinite; }
 .connection-badge--dark { color: rgba(255,255,255,.58); }
 .connection-badge--dark.connection-badge--live { color: #80c59d; }
@@ -473,3 +473,51 @@ html[data-theme="dark"] .public-footer { border-color: rgba(255, 255, 255, .1); 
 @media (max-width: 780px) { .theme-toggle { right: 14px; bottom: calc(82px + env(safe-area-inset-bottom)); } }
 @media (max-width: 620px) { .cashier-page .theme-toggle { bottom: calc(82px + env(safe-area-inset-bottom)); } }
 @media (prefers-reduced-motion: reduce) { .theme-toggle, .theme-toggle__sun, .theme-toggle__moon { transition: none; } }
+
+/* Customer tracking: the button now opens a real status journey instead of a toast. */
+.connection-badge__label--short { display: none; }
+.tracking-strip { flex-wrap: wrap; }
+.tracking-strip__timeline { width: 100%; }
+.order-timeline { display: grid; gap: 14px; border-top: 1px solid rgba(78,59,35,.11); margin-top: 2px; padding-top: 15px; animation: order-timeline-in 280ms cubic-bezier(.2,.8,.2,1) both; }
+.order-timeline header, .order-timeline footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.order-timeline h2 { margin: 3px 0 0; color: var(--text-primary); font-size: .98rem; text-transform: capitalize; }
+.order-timeline ol { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; }
+.order-timeline li { display: grid; grid-template-columns: 25px 1fr; align-items: center; gap: 9px; color: var(--text-muted); }
+.order-timeline li > span { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid #d8cdbc; border-radius: 50%; background: #fffaf1; color: #8d7b66; font-size: .66rem; font-weight: 850; }
+.order-timeline li.is-complete { color: #365f42; }.order-timeline li.is-complete > span { border-color: #79b38a; background: #e6f3e8; color: #2e7445; }
+.order-timeline li div { display: grid; gap: 2px; }.order-timeline li strong { font-size: .74rem; }.order-timeline li small, .order-timeline footer { color: var(--text-muted); font-size: .64rem; }
+.order-timeline__exception { margin: 0; border-left: 3px solid #ba5a43; padding-left: 9px; color: #884133; font-size: .72rem; line-height: 1.45; }
+
+/* A brief, success-only celebration after a pickup name is confirmed. */
+.pickup-celebration { position: fixed; z-index: 100; right: 22px; bottom: max(22px, env(safe-area-inset-bottom)); display: grid; width: min(430px, calc(100vw - 36px)); grid-template-columns: 52px 1fr; gap: 13px; overflow: hidden; border: 1px solid rgba(219,113,35,.42); border-radius: 20px; padding: 17px; background: linear-gradient(135deg, #fff7e9, #ffe2b2); box-shadow: 0 22px 55px rgba(104,54,15,.29); color: #392817; animation: celebration-in 520ms cubic-bezier(.17,.84,.32,1.28) both; }
+.pickup-celebration__flame { display: grid; width: 52px; height: 52px; place-items: center; border-radius: 18px 18px 18px 5px; background: #e9711c; color: #fff7d9; box-shadow: inset 0 -5px 0 rgba(126,49,7,.14); animation: celebration-flame 900ms ease-in-out infinite alternate; }
+.pickup-celebration > div:nth-child(3) { display: grid; align-content: center; gap: 3px; }.pickup-celebration strong { font-size: .95rem; }.pickup-celebration p { margin: 0; color: #705236; font-size: .7rem; line-height: 1.4; }
+.pickup-celebration__actions { grid-column: 1 / -1; display: flex; gap: 8px; }.pickup-celebration__actions .button, .pickup-celebration__actions .quiet-button { min-height: 36px; font-size: .68rem; }.pickup-celebration__actions .quiet-button { margin-left: auto; }
+.pickup-celebration__sparks { position: absolute; inset: 0; pointer-events: none; }.pickup-celebration__sparks i { position: absolute; top: 52%; left: 17%; width: 6px; height: 6px; border-radius: 50%; background: hsl(calc(18deg + var(--spark) * 18deg) 90% 54%); animation: celebration-spark 900ms cubic-bezier(.12,.72,.25,1) both; animation-delay: calc(var(--spark) * 42ms); }
+
+@keyframes order-timeline-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes celebration-in { from { opacity: 0; transform: translateY(28px) scale(.86) rotate(-2deg); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0); } }
+@keyframes celebration-flame { to { transform: translateY(-3px) rotate(-4deg) scale(1.05); } }
+@keyframes celebration-spark { from { opacity: 1; transform: rotate(calc(var(--spark) * 30deg)) translate(0) scale(1); } to { opacity: 0; transform: rotate(calc(var(--spark) * 30deg)) translate(98px) scale(.15); } }
+
+@media (max-width: 780px) {
+  .restaurant-hero__actions { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; }
+  .restaurant-hero__actions .button, .restaurant-hero__actions .outline-button { width: 100%; justify-content: center; padding-right: 12px; padding-left: 12px; text-align: center; }
+}
+
+@media (max-width: 620px) {
+  .customer-nav .connection-badge, .cashier-header__tools .connection-badge, .waiter-header__actions .connection-badge, .kitchen-header__actions .connection-badge { display: inline-flex; flex: none; gap: 4px; font-size: .61rem; }
+  .connection-badge__label--full { display: none; }.connection-badge__label--short { display: inline; }
+  .customer-access-link { display: none; }.customer-nav__actions { margin-left: auto; }
+  .tracking-strip .quiet-button { margin-left: 0; }.tracking-strip__main { min-width: 0; }.tracking-strip__main strong { display: block; overflow: hidden; max-width: 230px; text-overflow: ellipsis; white-space: nowrap; }
+  .order-timeline header { align-items: flex-start; }.order-timeline h2 { font-size: .88rem; }.order-timeline footer { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .pickup-celebration { right: 13px; bottom: calc(13px + env(safe-area-inset-bottom)); width: calc(100vw - 26px); grid-template-columns: 43px 1fr; padding: 14px; }.pickup-celebration__flame { width: 43px; height: 43px; border-radius: 15px 15px 15px 4px; }.pickup-celebration strong { font-size: .83rem; }
+}
+
+@media (max-width: 420px) {
+  .restaurant-hero__actions { grid-template-columns: 1fr; justify-items: center; }.restaurant-hero__actions .button, .restaurant-hero__actions .outline-button { max-width: 270px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-timeline, .pickup-celebration, .pickup-celebration__flame, .pickup-celebration__sparks i { animation: none; }
+}

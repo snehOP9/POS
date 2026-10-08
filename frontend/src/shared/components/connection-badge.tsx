@@ -14,6 +14,16 @@ const labelFor = (state: LiveConnectionState) => ({
   offline: "Offline",
 })[state];
 
+const shortLabelFor = (state: LiveConnectionState) => ({
+  unconfigured: "Offline",
+  preview: "Preview",
+  connecting: "Syncing",
+  live: "Live",
+  reconnecting: "Reconnecting",
+  reauthenticating: "Restoring",
+  offline: "Offline",
+})[state];
+
 export const ConnectionBadge = ({ live = false, dark = false }: { live?: ConnectionValue; dark?: boolean }) => {
   const browserOnline = useOnline();
   const state: LiveConnectionState = typeof live === "boolean" ? (live ? "live" : browserOnline ? "reconnecting" : "offline") : live;
@@ -22,7 +32,8 @@ export const ConnectionBadge = ({ live = false, dark = false }: { live?: Connect
   return (
     <span className={`connection-badge ${dark ? "connection-badge--dark" : ""} ${connected ? "connection-badge--live" : ""}`} aria-live="polite">
       {visibleState === "offline" ? <CloudOff size={14} aria-hidden="true" /> : <Radio size={14} aria-hidden="true" />}
-      {labelFor(visibleState)}
+      <span className="connection-badge__label connection-badge__label--full">{labelFor(visibleState)}</span>
+      <span className="connection-badge__label connection-badge__label--short">{shortLabelFor(visibleState)}</span>
     </span>
   );
 };

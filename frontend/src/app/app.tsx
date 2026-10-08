@@ -3,7 +3,6 @@ import { ArrowRight, Flame, LockKeyhole } from "lucide-react";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { NotificationCenter } from "@/shared/components/notification-center";
 import { ServiceWorkerUpdateNotice } from "@/shared/components/service-worker-update";
-import { ThemeToggle } from "@/shared/components/theme-toggle";
 import { ToastRail } from "@/shared/components/toast-rail";
 import { updateDocumentMetadata } from "@/shared/lib/seo";
 import { PosProvider, usePos } from "@/shared/store/pos-store";
@@ -81,6 +80,5 @@ export const App = () => <BrowserRouter>
     <ServiceWorkerUpdateNotice />
     <NotificationCenter />
     <ToastRail />
-    <ThemeToggle />
   </PosProvider>
 </BrowserRouter>;
