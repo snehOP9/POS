@@ -13,7 +13,6 @@ import { usePos } from "@/shared/store/pos-store";
 import { selectionForOption, unitPriceForSelection } from "@/shared/lib/cart";
 import type { MenuItem, Order, OrderStatus } from "@/shared/types/domain";
 import { isActiveOrder } from "@/shared/lib/order-state";
-import { useLiveUpdates } from "@/shared/hooks/useLiveUpdates";
 import { Link, useLocation } from "react-router-dom";
 import { PublicFooter } from "@/public/public-pages";
 
@@ -113,7 +112,7 @@ const PickupCelebration = ({ name, onTrack, onDismiss }: { name: string; onTrack
 </aside>;
 
 export const MenuPage = () => {
-  const { cart, setCartOpen, placeOrder, cartMode, setCartMode, orders, menu: items, menuLoading, menuError, refreshMenu, refreshOperations, demoMode, notify, restaurant } = usePos();
+  const { cart, setCartOpen, placeOrder, cartMode, setCartMode, orders, menu: items, menuLoading, menuError, refreshMenu, demoMode, notify, restaurant } = usePos();
   const location = useLocation();
   const tableToken = useMemo(() => {
     const query = new URLSearchParams(location.search);
@@ -130,10 +129,6 @@ export const MenuPage = () => {
   const [selectedDish, setSelectedDish] = useState<MenuItem>();
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [celebrationName, setCelebrationName] = useState<string>();
-  const live = useLiveUpdates((events) => {
-    if (events.has("menu:updated") || events.has("connection:restored")) refreshMenu();
-    if ([...events].some((event) => event !== "menu:updated")) refreshOperations();
-  }, !demoMode);
   useEffect(() => {
     refreshMenu();
   }, [refreshMenu]);
@@ -185,7 +180,7 @@ export const MenuPage = () => {
   const knownAllergens = useMemo(() => [...new Set(items.flatMap((item) => item.allergens ?? []).map((allergen) => allergen.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right)), [items]);
 
   return <><main className="customer-page">
-    <header className="customer-nav"><Brand name={restaurant?.name ?? "Ember & Grain"} descriptor={restaurant?.publicProfile?.cuisine ?? "Restaurant"} /><nav aria-label="Customer navigation"><Link to="/">Home</Link><a href="#menu-list">Menu</a><Link to="/visit">Visit</Link>{restaurant?.publicProfile?.reservationEnabled !== false && <Link to="/reservations">Reservations</Link>}{latestOrder && <a href="#tracking" onClick={() => setTrackingOpen(true)}>Order status</a>}</nav><div className="customer-nav__actions"><ConnectionBadge live={live} /><Link className="customer-access-link" to="/access">Staff sign in</Link><button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
+    <header className="customer-nav"><Brand name={restaurant?.name ?? "Ember & Grain"} descriptor={restaurant?.publicProfile?.cuisine ?? "Restaurant"} /><nav aria-label="Customer navigation"><Link to="/">Home</Link><a href="#menu-list">Menu</a><Link to="/visit">Visit</Link>{restaurant?.publicProfile?.reservationEnabled !== false && <Link to="/reservations">Reservations</Link>}{latestOrder && <a href="#tracking" onClick={() => setTrackingOpen(true)}>Order status</a>}</nav><div className="customer-nav__actions"><ConnectionBadge live={demoMode ? "preview" : "guest"} /><Link className="customer-access-link" to="/access">Staff sign in</Link><button type="button" className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Open cart, ${count} items`}><ShoppingBag size={18} /><span>{count || "Cart"}</span>{count > 0 && <b>{count}</b>}</button></div></header>
 
     <section className="menu-hero">
       <div className="menu-hero__copy"><span className="hero-kicker"><span>A brighter kind of dining</span><Sparkles size={14} aria-hidden="true" /></span><h1>Bold flavours,<br /><em>served slow enough</em><br />to remember.</h1><p>Seasonal Indian plates, grilled over flame and brought to your table with care.</p><a className="button button--charcoal" href="#menu-list">Explore today’s menu <ChevronRight size={17} /></a><div className="hero-context"><span><MapPin size={16} /> {dineInAvailable ? "Table ordering is available for this visit" : "Pickup ordering is available"}</span><span><Clock3 size={16} /> Availability is confirmed at checkout</span></div></div>
