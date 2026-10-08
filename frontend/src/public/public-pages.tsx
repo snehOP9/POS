@@ -133,12 +133,17 @@ const headings: Record<LegalKind, { eyebrow: string; title: string; description:
   },
 };
 
+const LegalPageHeader = ({ restaurant }: { restaurant: PublicRestaurantInfo }) => <header className="legal-page-header">
+  <Brand name={restaurant.name} descriptor={restaurant.publicProfile?.cuisine ?? "Restaurant"} />
+</header>;
+
 export const LegalPage = ({ kind }: { kind: LegalKind }) => {
   const { restaurant: restaurantInfo } = usePos();
   const restaurant = restaurantInfo ?? fallbackRestaurant;
   const heading = headings[kind];
 
   return <>
+    <LegalPageHeader restaurant={restaurant} />
     <main className="legal-page">
       <div className="legal-page__heading">
         <span className="eyebrow"><ShieldCheck size={14} /> {heading.eyebrow}</span>
