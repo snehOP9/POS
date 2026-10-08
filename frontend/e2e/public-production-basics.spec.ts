@@ -18,6 +18,15 @@ test("footer navigation opens legal pages at the top", async ({ page }) => {
   await page.waitForFunction(() => window.scrollY === 0, undefined, { timeout: 250 });
 });
 
+test("cookie notice keeps the restaurant brand as a route home", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/privacy?preview=1");
+  await page.getByRole("button", { name: "Cookie and storage notice" }).click();
+  await page.getByRole("dialog", { name: /essential storage supports the service/i }).getByRole("link").click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".restaurant-header")).toBeVisible();
+});
+
 test("public legal, contact, cookie information, and recovery routes are accessible on compact viewports", async ({ page }) => {
   await page.route("**/api/**", (route) => route.abort());
 
@@ -35,7 +44,9 @@ test("public legal, contact, cookie information, and recovery routes are accessi
   await page.goto("/privacy");
   await expect(page.locator(".legal-page-header").getByRole("link")).toHaveAttribute("href", "/");
   await page.getByRole("button", { name: "Cookie and storage notice" }).click();
-  await expect(page.getByRole("dialog", { name: /essential storage supports the service/i })).toBeVisible();
+  const cookieDialog = page.getByRole("dialog", { name: /essential storage supports the service/i });
+  await expect(cookieDialog).toBeVisible();
+  await expect(cookieDialog.getByRole("link")).toHaveAttribute("href", "/");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: /essential storage supports the service/i })).toBeHidden();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "index, follow");

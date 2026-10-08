@@ -50,10 +50,12 @@ test("restaurant home, visit, and reservation routes remain clear and responsive
 
     await page.goto("/visit");
     await expect(page.getByRole("heading", { name: "Come hungry. Stay awhile." })).toBeVisible();
+    await expect(page.locator(".restaurant-header .brand")).toHaveAttribute("href", "/");
     await expect(page.getByText("The restaurant address has not been published yet.")).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 
     await page.goto("/reservations");
+    await expect(page.locator(".restaurant-header .brand")).toHaveAttribute("href", "/");
     await expect(page.getByRole("heading", { name: "We’ll hold the table." })).toBeVisible();
     await expect(page.getByText("A request is not a confirmed booking.")).toBeVisible();
     await expect(page.getByRole("checkbox")).toBeVisible();

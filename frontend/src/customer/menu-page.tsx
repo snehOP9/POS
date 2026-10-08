@@ -156,7 +156,7 @@ export const MenuPage = () => {
     const matchesCategory = activeCategory === "All" || item.category === activeCategory;
     const query = search.trim().toLowerCase();
     const matchesSearch = !query || `${item.name} ${item.description} ${item.tags.join(" ")}`.toLowerCase().includes(query);
-    const matchesDiet = dietaryFilter === "all" || dietaryFilter === "vegetarian" ? item.dietary !== "non-veg" : item.dietary === "vegan";
+    const matchesDiet = dietaryFilter === "all" ? true : dietaryFilter === "vegetarian" ? item.dietary !== "non-veg" : item.dietary === "vegan";
     const matchesAllergen = !excludedAllergen || !(item.allergens ?? []).map((allergen) => allergen.toLowerCase()).includes(excludedAllergen.toLowerCase());
     return matchesCategory && matchesSearch && matchesDiet && matchesAllergen && (!showSignatures || item.featured) && (!spicyOnly || Boolean(item.heat));
   }), [activeCategory, dietaryFilter, excludedAllergen, items, search, showSignatures, spicyOnly]);

@@ -138,5 +138,35 @@ export const expandedCatalogue = (pexels: (id: string) => string): SeedItem[] =>
     ["Aloo Paratha", "Stuffed whole-wheat paratha, curd and pickle.", 22500, "VEGETARIAN", "TANDOOR", 13],
     ["Poha with Peanuts", "Flattened rice, curry leaf, peanuts and fresh lime.", 16500, "VEGAN", "HOT", 8],
     ["Masala Omelette", "Farm eggs, onion, tomato, chilli and toasted pav.", 21500, "NON_VEGETARIAN", "HOT", 9]
+  ]),
+  ...expandCategory("Seasonal Signatures", pexels("28675074"), [
+    ["Smoked Pumpkin Korma", "Roasted pumpkin, cashew korma and crisp curry leaf.", 39500, "VEGETARIAN", "HOT", 16, true],
+    ["Charred Cauliflower Kadai", "Fire-roasted cauliflower, tomato, pepper and coriander.", 37500, "VEGAN", "HOT", 15],
+    ["Tandoori Bhatti Corn", "Charred corn, kasundi butter, lime and chaat masala.", 29500, "VEGETARIAN", "TANDOOR", 10],
+    ["Guntur Pepper Prawns", "Seared prawns, Guntur chilli, black pepper and lime.", 58500, "NON_VEGETARIAN", "HOT", 18, true],
+    ["Lamb Nihari Pot", "Slow-cooked lamb shank, ginger, marrow and warm spices.", 62500, "NON_VEGETARIAN", "HOT", 28],
+    ["Kashmiri Morel Pulao", "Aromatic basmati, morels, saffron and toasted nuts.", 47500, "VEGETARIAN", "HOT", 18],
+    ["Burrata Chaat", "Creamy burrata, roasted tomatoes, sev and tamarind.", 38500, "VEGETARIAN", "COLD", 10],
+    ["Dates and Cashew Kebab", "Soft dates, cashew, cardamom and a chilli-lime glaze.", 33500, "VEGAN", "TANDOOR", 12]
+  ]),
+  ...expandCategory("For the Table", pexels("33430556"), [
+    ["Ember Vegetarian Grill", "Paneer, broccoli, mushroom and peppers with three chutneys.", 99500, "VEGETARIAN", "TANDOOR", 22, true],
+    ["Coastal Fire Grill", "Fish tikka, prawns, coconut sambal and charred lemon.", 139500, "NON_VEGETARIAN", "TANDOOR", 25, true],
+    ["Tandoor Tasting Board", "Chicken tikka, fish tikka, naan, pickles and mint chutney.", 129500, "NON_VEGETARIAN", "TANDOOR", 24],
+    ["Vegetarian Curry Night", "Dal makhani, palak paneer, jeera rice, naan and salad.", 119500, "VEGETARIAN", "HOT", 22],
+    ["Curry Night for Two", "Malabar prawn curry, dal, rice, naan and a cooler.", 149500, "NON_VEGETARIAN", "HOT", 24],
+    ["Chaat and Cooler Spread", "Papdi chaat, dahi puri, kale chana chaat and two coolers.", 79500, "VEGETARIAN", "COLD", 15],
+    ["Biryani Feast", "Chicken biryani, jackfruit dum biryani, raita and salad.", 169500, "NON_VEGETARIAN", "HOT", 26],
+    ["Sweet Finish Sharing Plate", "Kulfi, phirni, gulab jamun and pistachio rabri.", 79500, "VEGETARIAN", "COLD", 12]
+  ]),
+  ...expandCategory("Chai & Coffee", pexels("17200460"), [
+    ["Masala Chai", "Slow-brewed Assam tea, ginger, cardamom and milk.", 12000, "VEGETARIAN", "BAR", 5],
+    ["Ginger Jaggery Chai", "Fresh ginger, dark jaggery and warming spices.", 13500, "VEGETARIAN", "BAR", 5],
+    ["South Indian Filter Coffee", "Dark roast coffee, chicory and steamed milk.", 15500, "VEGETARIAN", "BAR", 5],
+    ["Saffron Cappuccino", "Espresso, saffron milk foam and a pistachio dusting.", 22500, "VEGETARIAN", "BAR", 6],
+    ["Cold Brew Chai", "Overnight-spiced tea, oat milk and jaggery foam.", 21500, "VEGAN", "BAR", 4],
+    ["Cardamom Affogato", "Vanilla kulfi, espresso and green cardamom.", 28500, "VEGETARIAN", "COLD", 5],
+    ["Rose Espresso Tonic", "Espresso, rose, citrus and chilled tonic.", 24500, "VEGAN", "BAR", 4],
+    ["Hot Chocolate", "Single-origin chocolate, milk and salted cashew cream.", 23500, "VEGETARIAN", "BAR", 6]
   ])
 ];
