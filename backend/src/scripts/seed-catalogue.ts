@@ -170,3 +170,12 @@ export const expandedCatalogue = (pexels: (id: string) => string): SeedItem[] =>
     ["Hot Chocolate", "Single-origin chocolate, milk and salted cashew cream.", 23500, "VEGETARIAN", "BAR", 6]
   ])
 ];
+
+const guestCatalogueCategoryNames = new Set(["Seasonal Signatures", "For the Table", "Chai & Coffee"]);
+
+/**
+ * The final guest-menu expansion is kept separately so a deployed demo can
+ * safely receive these additions without re-running the full demo seed.
+ */
+export const guestCatalogueAdditions = (pexels: (id: string) => string): SeedItem[] =>
+  expandedCatalogue(pexels).filter((item) => guestCatalogueCategoryNames.has(item.category));

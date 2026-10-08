@@ -4,10 +4,12 @@ import { createApp } from "./app.js";
 import { connectDatabase, disconnectDatabase } from "./config/database.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
+import { ensureGuestCatalogueAdditions } from "./services/catalogue-migration.service.js";
 import { initializeSocket } from "./services/socket.service.js";
 
 async function bootstrap(): Promise<void> {
   await connectDatabase();
+  await ensureGuestCatalogueAdditions();
   const app = createApp();
   const server = http.createServer(app);
   initializeSocket(server);
