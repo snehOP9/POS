@@ -173,7 +173,7 @@ interface PosStore {
   openTableSession: (tableId: string, guestCount: number, note?: string) => void;
   updateTableSession: (tableId: string, guestCount: number, note?: string) => void;
   closeTableSession: (tableId: string) => void;
-  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone?: string }, guestCount?: number, tableToken?: string) => void;
+  placeOrder: (source: "customer" | "waiter" | "cashier", payment?: "UNPAID" | "PAID", cashReceivedPaise?: number, pickup?: { name: string; phone?: string }, guestCount?: number, tableToken?: string) => Promise<boolean>;
   startTicket: (ticketId: string) => void;
   markTicketItemReady: (ticketId: string, itemId: string) => void;
   markTicketReady: (ticketId: string) => void;
@@ -602,10 +602,10 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
   const placeOrder = useCallback((source: "customer" | "waiter" | "cashier", payment: "UNPAID" | "PAID" = "UNPAID", cashReceivedPaise?: number, pickup?: { name: string; phone?: string }, guestCount?: number, tableToken?: string) => {
     if (!cart.length) {
       notify("Add something delicious before placing an order.", "danger");
-      return;
+      return Promise.resolve(false);
     }
     const operation = `order:create:${source}`;
-    if (!demoMode && !startOperation(operation)) return;
+    if (!demoMode && !startOperation(operation)) return Promise.resolve(false);
 
     const table = tables.find((candidate) => candidate.id === selectedTableId);
     const numericId = 1050 + orders.length;
@@ -681,11 +681,11 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
     if (demoMode) {
       const demoOrder = payment === "PAID" ? { ...createdOrder, paymentStatus: "PAID" as const } : createdOrder;
       commitOrder(demoOrder, source === "cashier" ? `Preview: ${demoOrder.displayId} settled and sent to kitchen.` : `Preview: ${demoOrder.displayId} is with the kitchen.`);
-      return;
+      return Promise.resolve(true);
     }
 
     notify(`Creating ${createdOrder.displayId} with the server…`, "info");
-    void (source === "waiter" && table
+    return (source === "waiter" && table
       ? api.waiter.createOrder(table.id, { ...requestPayload, tableId: undefined })
       : source === "cashier"
         ? api.cashier.createOrder(requestPayload)
@@ -700,22 +700,25 @@ export const PosProvider = ({ children }: PropsWithChildren) => {
         : { ...createdOrder, id: persistedId, ...(trackingToken ? { guestTrackingToken: trackingToken } : {}) };
       if (payment !== "PAID") {
         commitOrder(persistedOrder, `${persistedOrder.displayId} is with the kitchen.`);
-        return;
+        return true;
       }
       try {
         if (typeof cashReceivedPaise !== "number") {
           commitOrder(persistedOrder, `${persistedOrder.displayId} was created and awaits settlement.`, "info");
-          return;
+          return true;
         }
         await api.payments.cash({ orderId: persistedId, cashReceivedPaise });
         commitOrder({ ...persistedOrder, paymentStatus: "PAID" }, `${persistedOrder.displayId} is paid and with the kitchen.`);
+        return true;
       } catch (error) {
         commitOrder({ ...persistedOrder, paymentStatus: "PAYMENT_PENDING" }, `${persistedOrder.displayId} was created, but cash settlement needs attention.`, "danger");
         if (error instanceof ApiError) notify(error.message, "danger");
+        return true;
       }
     }).catch((error: unknown) => {
       const message = error instanceof ApiError ? error.message : "The API is unavailable. Your order has not been created.";
       notify(message, "danger");
+      return false;
     }).finally(() => finishOperation(operation));
   }, [cart, cartMode, demoMode, finishOperation, notify, orders.length, pricing, refreshOperations, rememberGuestOrder, selectedTableId, startOperation, tables]);
 

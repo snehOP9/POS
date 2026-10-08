@@ -1,6 +1,29 @@
 import { expect, test } from "@playwright/test";
 import axe from "axe-core";
 
+test("mobile hero actions stay centred and fully reachable", async ({ page }) => {
+  await page.route("**/api/**", (route) => route.abort());
+  for (const width of [320, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/");
+    const actions = page.locator(".restaurant-hero__actions a");
+    await expect(actions).toHaveCount(2);
+    const container = await page.locator(".restaurant-hero__actions").boundingBox();
+    expect(container).not.toBeNull();
+    for (let index = 0; index < 2; index += 1) {
+      const box = await actions.nth(index).boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(container!.x - 1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(container!.x + container!.width + 1);
+    }
+    if (width <= 390) {
+      const box = await actions.first().boundingBox();
+      expect(Math.abs((box!.x + box!.width / 2) - (container!.x + container!.width / 2))).toBeLessThan(2);
+    }
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+});
+
 test("restaurant home, visit, and reservation routes remain clear and responsive without configured API data", async ({ page }) => {
   await page.route("**/api/**", (route) => route.abort());
 

@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Laptop, LogOut, Moon, ShieldCheck, Sun, UserRound, X } from "lucide-react";
+import { LogOut, ShieldCheck, UserRound, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDialogFocus } from "@/shared/hooks/useDialogFocus";
-import { useThemePreference, type ThemePreference } from "@/shared/lib/theme-preference";
 import { usePos } from "@/shared/store/pos-store";
 
 const workspaceLabel = {
@@ -21,7 +20,6 @@ export const StaffProfileMenu = ({ className = "", label }: StaffProfileMenuProp
   const { logout, session } = usePos();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const { preference, setPreference } = useThemePreference();
   const close = () => setOpen(false);
   const dialogRef = useDialogFocus(open, close);
   const name = session?.name ?? "Staff member";
@@ -46,9 +44,6 @@ export const StaffProfileMenu = ({ className = "", label }: StaffProfileMenuProp
           <button type="button" className="icon-button" onClick={close} aria-label="Close profile menu"><X size={18} /></button>
         </header>
         <p><ShieldCheck size={17} /> Your session and role permissions stay protected on this device.</p>
-        <section className="staff-profile-appearance" aria-labelledby="appearance-title"><span id="appearance-title">Appearance</span><div role="group" aria-label="Theme preference">
-          {([ ["light", Sun, "Light"], ["system", Laptop, "System"], ["dark", Moon, "Dark"] ] as const).map(([value, Icon, labelText]) => <button key={value} type="button" className={preference === value ? "is-active" : ""} aria-pressed={preference === value} onClick={() => setPreference(value as ThemePreference)}><Icon size={15} /> {labelText}</button>)}
-        </div></section>
         <div className="staff-profile-dialog__actions">
           <Link className="outline-button" to="/access" onClick={close}>Switch profile</Link>
           <button type="button" className="button button--saffron" onClick={signOut}><LogOut size={16} /> Sign out</button>
