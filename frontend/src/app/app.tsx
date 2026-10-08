@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type PropsWithChildren } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, type PropsWithChildren } from "react";
 import { ArrowRight, Flame, LockKeyhole } from "lucide-react";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { NotificationCenter } from "@/shared/components/notification-center";
@@ -31,12 +31,12 @@ const TitleUpdater = () => {
 
 const RouteScrollReset = () => {
   const location = useLocation();
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (location.hash) {
-      document.getElementById(location.hash.slice(1))?.scrollIntoView();
+      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "instant" });
       return;
     }
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [location.hash, location.pathname]);
   return null;
 };

@@ -9,13 +9,13 @@ test("footer navigation opens legal pages at the top", async ({ page }) => {
   await page.locator(".public-footer").getByRole("link", { name: "Terms of use" }).click();
   await expect(page).toHaveURL(/\/terms$/);
   await expect(page.getByRole("heading", { name: "Terms of Use" })).toBeInViewport();
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.waitForFunction(() => window.scrollY === 0, undefined, { timeout: 250 });
 
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.locator(".public-footer").getByRole("link", { name: "Privacy notice" }).click();
   await expect(page).toHaveURL(/\/privacy$/);
   await expect(page.getByRole("heading", { name: "Privacy Notice" })).toBeInViewport();
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.waitForFunction(() => window.scrollY === 0, undefined, { timeout: 250 });
 });
 
 test("public legal, contact, cookie information, and recovery routes are accessible on compact viewports", async ({ page }) => {
