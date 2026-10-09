@@ -207,9 +207,9 @@ export async function createOrder(actor: ActorContext, input: CreateOrderInput) 
     });
   }
 
-  const order = await OrderModel.create({
+  const orderData = {
     restaurantId: restaurant._id,
-    orderNumber: orderNumber(restaurant.invoicePrefix),
+    orderNumber: "",
     mode: input.mode,
     ...tableContext,
     ...(actor.role === "CUSTOMER" && !actor.guestCheckout ? { customerId: toObjectId(actor.accountId) } : {}),
@@ -218,12 +218,38 @@ export async function createOrder(actor: ActorContext, input: CreateOrderInput) 
     ...(input.guestName ? { guestName: input.guestName } : {}),
     ...(input.guestPhone ? { guestPhone: input.guestPhone } : {}),
     status,
-    paymentStatus: "UNPAID",
+    paymentStatus: "UNPAID" as const,
     items: quote.items,
     pricing: quote.pricing,
     timeline,
     source
-  });
+  };
+
+  let order: OrderDocument | undefined;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    orderData.orderNumber = orderNumber(restaurant.invoicePrefix);
+    try {
+      order = await OrderModel.create(orderData);
+      break;
+    } catch (error) {
+      const duplicateOrderNumber =
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === 11000 &&
+        "keyPattern" in error &&
+        typeof error.keyPattern === "object" &&
+        error.keyPattern !== null &&
+        "orderNumber" in error.keyPattern &&
+        "restaurantId" in error.keyPattern;
+
+      if (!duplicateOrderNumber || attempt === 2) throw error;
+    }
+  }
+
+  if (!order) {
+    throw conflict("ORDER_NUMBER_GENERATION_FAILED", "Could not generate a unique order number; please retry");
+  }
 
   if (!isDraft) await createKitchenTickets(order);
   broadcastOrder("order:created", order);
