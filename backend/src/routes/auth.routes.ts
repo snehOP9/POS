@@ -5,6 +5,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { unauthorized } from "../lib/errors.js";
 import { sendSuccess } from "../lib/response.js";
 import { requireAuth, authContext } from "../middleware/auth.js";
+import { createLoginRateLimiter } from "../middleware/loginRateLimit.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { AccountModel } from "../models/Account.js";
 import { issueTokens, passwordMatches, publicAccount, verifyToken, hashPassword } from "../services/auth.service.js";
@@ -36,7 +37,7 @@ function userPayload(account: Parameters<typeof publicAccount>[0]) {
 
 export const authRouter = Router();
 
-authRouter.post("/login", validateRequest(loginRequestSchema), asyncHandler(async (request, response) => {
+authRouter.post("/login", createLoginRateLimiter(), validateRequest(loginRequestSchema), asyncHandler(async (request, response) => {
   const { email, password } = request.body as { email: string; password: string };
   const account = await AccountModel.findOne({ email: email.toLowerCase() }).select("+passwordHash +refreshTokenHash +tokenVersion");
   if (!account || !account.active || !(await passwordMatches(password, account.passwordHash))) {
