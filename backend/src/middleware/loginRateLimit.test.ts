@@ -37,7 +37,8 @@ test("limits repeated failed logins to five in fifteen minutes", async () => {
 
     const blocked = await fetch(url, { method: "POST" });
     assert.equal(blocked.status, 429);
-    assert.equal((await blocked.json()).error.code, "AUTH_RATE_LIMITED");
+    const body = await blocked.json() as { error: { code: string } };
+    assert.equal(body.error.code, "AUTH_RATE_LIMITED");
   });
 });
 
