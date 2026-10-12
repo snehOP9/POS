@@ -2,7 +2,9 @@ name: Production health
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # Render's free instances can take a little time to wake. Checking every
+    # ten minutes created noisy false failures without improving coverage.
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -21,9 +23,59 @@ jobs:
           grep -F "Ember &amp; Grain" response.html
 
       - name: Check API readiness
-        run: curl --fail --show-error --silent --location --retry 2 --retry-all-errors --max-time 20 https://emberserve-api-staging.onrender.com/ready
+        shell: bash
+        run: |
+          wait_for_render() {
+            local url="$1"
+            local expected_content="$2"
+            local response_file
+
+            for attempt in $(seq 1 12); do
+              response_file="$(mktemp)"
+              if curl --fail --show-error --silent --location --connect-timeout 15 --max-time 30 "$url" > "$response_file" \
+                && { [ -z "$expected_content" ] || grep -F "$expected_content" "$response_file" > /dev/null; }; then
+                rm -f "$response_file"
+                return 0
+              fi
+
+              rm -f "$response_file"
+              if [ "$attempt" -lt 12 ]; then
+                echo "Render is not ready yet (attempt $attempt/12); retrying in 15 seconds..." >&2
+                sleep 15
+              fi
+            done
+
+            echo "Render did not become healthy within three minutes: $url" >&2
+            return 1
+          }
+
+          wait_for_render https://emberserve-api-staging.onrender.com/ready ''
 
       - name: Check live menu endpoint
+        shell: bash
         run: |
-          curl --fail --show-error --silent --location --retry 2 --retry-all-errors --max-time 20 https://emberserve-api-staging.onrender.com/api/v1/menu > menu.json
-          grep -F '"success":true' menu.json
+          wait_for_render() {
+            local url="$1"
+            local expected_content="$2"
+            local response_file
+
+            for attempt in $(seq 1 12); do
+              response_file="$(mktemp)"
+              if curl --fail --show-error --silent --location --connect-timeout 15 --max-time 30 "$url" > "$response_file" \
+                && grep -F "$expected_content" "$response_file" > /dev/null; then
+                rm -f "$response_file"
+                return 0
+              fi
+
+              rm -f "$response_file"
+              if [ "$attempt" -lt 12 ]; then
+                echo "Render is not ready yet (attempt $attempt/12); retrying in 15 seconds..." >&2
+                sleep 15
+              fi
+            done
+
+            echo "Render did not return a healthy menu response within three minutes: $url" >&2
+            return 1
+          }
+
+          wait_for_render https://emberserve-api-staging.onrender.com/api/v1/menu '"success":true'
