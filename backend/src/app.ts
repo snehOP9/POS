@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 
 import compression from "compression";
 import cors from "cors";
@@ -31,8 +31,9 @@ function limiterHandler(_request: express.Request, response: express.Response): 
   });
 }
 
-export function createApp() {
+export function createApp(options: { readinessToken?: string } = {}) {
   const app = express();
+  const readinessToken = options.readinessToken ?? env.READINESS_TOKEN;
   if (env.TRUST_PROXY) app.set("trust proxy", 1);
   app.disable("x-powered-by");
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
@@ -68,6 +69,25 @@ export function createApp() {
         service: "emberserve-api",
         timestamp: new Date().toISOString()
       }
+    });
+  });
+
+  app.get("/health/ready", (request, response) => {
+    const expected = readinessToken ? Buffer.from(`Bearer ${readinessToken}`) : Buffer.alloc(0);
+    const provided = Buffer.from(request.header("authorization") ?? "");
+    const authorized = expected.length > 0 && provided.length === expected.length && timingSafeEqual(provided, expected);
+    if (!authorized) {
+      response.status(401).json({
+        success: false,
+        error: { code: "READINESS_AUTH_REQUIRED", message: "Authentication required" }
+      });
+      return;
+    }
+
+    const ready = databaseStatus() === "connected";
+    response.status(ready ? 200 : 503).json({
+      success: ready,
+      data: { status: ready ? "ready" : "not_ready", timestamp: new Date().toISOString() }
     });
   });
 
