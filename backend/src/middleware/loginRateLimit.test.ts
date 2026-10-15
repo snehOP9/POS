@@ -8,7 +8,7 @@ import { createLoginAccountLimiter } from "./loginRateLimit.js";
 test("login limiter is account-aware and resets after its window", async () => {
   const app = express();
   app.use(express.json());
-  app.post("/login", createLoginAccountLimiter({ windowMs: 80, limit: 2 }), (_request, response) => {
+  app.post("/login", createLoginAccountLimiter({ windowMs: 200, limit: 2 }), (_request, response) => {
     response.status(200).json({ success: true });
   });
 
@@ -30,7 +30,7 @@ test("login limiter is account-aware and resets after its window", async () => {
     assert.equal((await send("one@example.test")).status, 429);
     assert.equal((await send("two@example.test")).status, 200);
 
-    await new Promise((resolve) => setTimeout(resolve, 110));
+    await new Promise((resolve) => setTimeout(resolve, 250));
     assert.equal((await send("one@example.test")).status, 200);
   } finally {
     server.close();
