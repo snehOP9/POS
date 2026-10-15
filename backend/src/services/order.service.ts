@@ -12,7 +12,7 @@ import {
   type OrderStatus
 } from "../domain/orderTransitions.js";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
-import { orderNumber } from "../lib/ids.js";
+import { createWithUniqueOrderNumber } from "../lib/uniqueOrderNumber.js";
 import { serializeKitchenOrder, serializeOrder, serializeWaiterOrder, serializeTicket } from "../lib/serializers.js";
 import { DiningTableModel } from "../models/DiningTable.js";
 import { KitchenTicketModel, type KitchenTicketStatus } from "../models/KitchenTicket.js";
@@ -207,9 +207,9 @@ export async function createOrder(actor: ActorContext, input: CreateOrderInput) 
     });
   }
 
-  const order = await OrderModel.create({
+  const order = await createWithUniqueOrderNumber(restaurant.invoicePrefix, (generatedOrderNumber) => OrderModel.create({
     restaurantId: restaurant._id,
-    orderNumber: orderNumber(restaurant.invoicePrefix),
+    orderNumber: generatedOrderNumber,
     mode: input.mode,
     ...tableContext,
     ...(actor.role === "CUSTOMER" && !actor.guestCheckout ? { customerId: toObjectId(actor.accountId) } : {}),
@@ -223,7 +223,7 @@ export async function createOrder(actor: ActorContext, input: CreateOrderInput) 
     pricing: quote.pricing,
     timeline,
     source
-  });
+  }));
 
   if (!isDraft) await createKitchenTickets(order);
   broadcastOrder("order:created", order);
