@@ -1,5 +1,7 @@
 import { Router } from "express";
 
+import { loginAccountLimiter } from "../middleware/loginRateLimit.js";
+
 import { env } from "../config/env.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { unauthorized } from "../lib/errors.js";
@@ -36,7 +38,10 @@ function userPayload(account: Parameters<typeof publicAccount>[0]) {
 
 export const authRouter = Router();
 
-authRouter.post("/login", validateRequest(loginRequestSchema), asyncHandler(async (request, response) => {
+authRouter.post("/login", (request, response, next) => {
+  if (typeof request.body?.email !== "string" || !request.body.email.trim()) return next();
+  return loginAccountLimiter(request, response, next);
+}, validateRequest(loginRequestSchema), asyncHandler(async (request, response) => {
   const { email, password } = request.body as { email: string; password: string };
   const account = await AccountModel.findOne({ email: email.toLowerCase() }).select("+passwordHash +refreshTokenHash +tokenVersion");
   if (!account || !account.active || !(await passwordMatches(password, account.passwordHash))) {
