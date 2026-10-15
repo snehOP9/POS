@@ -39,7 +39,8 @@ VITE_API_URL=/api/v1 and Nginx serves the React Router fallback.
    [backup and restore](backup-restore.md).
 3. Provision production secrets outside source control. Use independent JWT
    access/refresh secrets, production Razorpay credentials, a restricted
-   CLIENT_URL, production MONGODB_URI, and COOKIE_SECURE=true. Guest ordering
+   CLIENT_URL, production MONGODB_URI, COOKIE_SECURE=true, and a random
+   READINESS_TOKEN of at least 32 characters for protected `/health/ready` diagnostics. Guest ordering
    is a direct server-validated flow and does not require a third-party mobile
    verification provider or public client credentials.
 4. Deploy the API and web images. Keep MongoDB private to the application
