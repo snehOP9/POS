@@ -30,6 +30,7 @@ const environmentSchema = z.object({
   RESEND_FROM_EMAIL: z.string().trim().email().optional(),
   RESERVATION_NOTIFICATION_EMAIL: z.string().trim().email().optional(),
   COOKIE_DOMAIN: z.string().trim().min(1).optional(),
+  READINESS_TOKEN: z.string().min(32).optional(),
   COOKIE_SECURE: booleanFromEnvironment.optional(),
   TRUST_PROXY: booleanFromEnvironment.optional().default("false"),
   ALLOW_PRODUCTION_SEED: booleanFromEnvironment.optional().default("false"),

@@ -38,6 +38,8 @@ npm run seed
 npm run dev
 Invoke-RestMethod http://localhost:4000/health
 Invoke-RestMethod http://localhost:4000/ready
+$headers = @{ Authorization = "Bearer $env:READINESS_TOKEN" }
+Invoke-RestMethod http://localhost:4000/health/ready -Headers $headers
 ~~~
 
 For the Docker stack, use:
@@ -51,9 +53,7 @@ docker compose ps
 docker compose logs api --tail=100
 ~~~
 
-The health response should identify emberserve-api with status ok and database
-connected. Credential-dependent checks require that the target database has
-already been seeded. Then sign in with each development role, confirm the
+The public `/health` endpoint is a liveness check and must not expose database state. `/ready` remains a generic readiness probe for the hosting platform. The more detailed `/health/ready` endpoint requires `Authorization: Bearer $READINESS_TOKEN`; configure a random secret of at least 32 characters in the environment before using it. Credential-dependent checks require that the target database has already been seeded. Then sign in with each development role, confirm the
 allowed panel route, create a non-financial test order, observe the kitchen
 update, and confirm a forbidden role receives a safe 403 response.
 
