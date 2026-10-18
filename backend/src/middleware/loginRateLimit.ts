@@ -17,7 +17,8 @@ export function createLoginAccountLimiter(options: LoginLimiterOptions = {}) {
       const email = typeof request.body?.email === "string"
         ? request.body.email.trim().toLowerCase()
         : "missing-email";
-      return createHash("sha256").update(email).digest("hex");
+      const ip = request.ip ?? request.socket.remoteAddress ?? "unknown";
+      return createHash("sha256").update(ip).update("\0").update(email).digest("hex");
     },
     handler: (_request, response) => {
       response.status(429).json({
@@ -32,3 +33,24 @@ export function createLoginAccountLimiter(options: LoginLimiterOptions = {}) {
 }
 
 export const loginAccountLimiter = createLoginAccountLimiter();
+
+// A separate per-IP budget limits account spraying even when emails vary.
+export function createLoginIpLimiter(options: LoginLimiterOptions = {}) {
+  return rateLimit({
+    windowMs: options.windowMs ?? 15 * 60 * 1000,
+    limit: options.limit ?? 30,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    handler: (_request, response) => {
+      response.status(429).json({
+        success: false,
+        error: {
+          code: "LOGIN_RATE_LIMITED",
+          message: "Too many login attempts; try again later"
+        }
+      });
+    }
+  });
+}
+
+export const loginIpLimiter = createLoginIpLimiter();

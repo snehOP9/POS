@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { loginAccountLimiter } from "../middleware/loginRateLimit.js";
+import { loginAccountLimiter, loginIpLimiter } from "../middleware/loginRateLimit.js";
 
 import { env } from "../config/env.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
@@ -38,7 +38,7 @@ function userPayload(account: Parameters<typeof publicAccount>[0]) {
 
 export const authRouter = Router();
 
-authRouter.post("/login", (request, response, next) => {
+authRouter.post("/login", loginIpLimiter, (request, response, next) => {
   if (typeof request.body?.email !== "string" || !request.body.email.trim()) return next();
   return loginAccountLimiter(request, response, next);
 }, validateRequest(loginRequestSchema), asyncHandler(async (request, response) => {
